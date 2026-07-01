@@ -10,13 +10,14 @@ class EpgEntry {
   const EpgEntry({required this.title, required this.start, required this.end});
 }
 
-/// Construye la URL de la API Xtream `get_short_epg` derivando TODO de la URL
-/// del stream, que en Xtream tiene la forma
+/// Construye una URL de la API Xtream para un [action] de EPG, derivando TODO
+/// de la URL del stream, que en Xtream tiene la forma
 /// `scheme://host:port/[live|movie|series]/user/pass/streamId.ext`.
 /// Así no dependemos de que haya una lista guardada activa.
 ///
 /// Devuelve null si la URL no encaja con ese patrón.
-Uri? buildShortEpgUrl(String streamUrl, {int limit = 4}) {
+Uri? buildEpgUrl(String streamUrl,
+    {String action = 'get_short_epg', int? limit}) {
   final s = Uri.tryParse(streamUrl);
   if (s == null) return null;
   final segs = s.pathSegments;
@@ -34,12 +35,20 @@ Uri? buildShortEpgUrl(String streamUrl, {int limit = 4}) {
     queryParameters: {
       'username': user,
       'password': pass,
-      'action': 'get_short_epg',
+      'action': action,
       'stream_id': streamId,
-      'limit': '$limit',
+      if (limit != null) 'limit': '$limit',
     },
   );
 }
+
+/// Guía corta (ahora/siguiente): `get_short_epg` con límite.
+Uri? buildShortEpgUrl(String streamUrl, {int limit = 4}) =>
+    buildEpgUrl(streamUrl, action: 'get_short_epg', limit: limit);
+
+/// Guía completa del canal: `get_simple_data_table` (todo el EPG disponible).
+Uri? buildFullEpgUrl(String streamUrl) =>
+    buildEpgUrl(streamUrl, action: 'get_simple_data_table');
 
 /// Parsea la respuesta JSON de `get_short_epg` (campo `epg_listings`).
 /// Los títulos vienen en base64; las horas en `start_timestamp`/`stop_timestamp`
@@ -88,8 +97,14 @@ class EpgService {
               receiveTimeout: const Duration(seconds: 12),
             ));
 
-  Future<List<EpgEntry>> shortEpg(String streamUrl) async {
-    final url = buildShortEpgUrl(streamUrl);
+  Future<List<EpgEntry>> shortEpg(String streamUrl) =>
+      _fetch(buildShortEpgUrl(streamUrl));
+
+  /// Guía completa del canal (todo el EPG disponible, varias horas/días).
+  Future<List<EpgEntry>> fullEpg(String streamUrl) =>
+      _fetch(buildFullEpgUrl(streamUrl));
+
+  Future<List<EpgEntry>> _fetch(Uri? url) async {
     if (url == null) return [];
     try {
       final resp = await _dio.getUri<dynamic>(url);

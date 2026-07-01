@@ -129,6 +129,12 @@ final previewEpgProvider =
   return ref.watch(epgServiceProvider).shortEpg(streamUrl);
 });
 
+/// Guía completa (todo el EPG disponible) del canal. Best-effort.
+final channelGuideProvider =
+    FutureProvider.family<List<EpgEntry>, String>((ref, streamUrl) {
+  return ref.watch(epgServiceProvider).fullEpg(streamUrl);
+});
+
 /// Clave para gestión por categoría: tipo de contenido + nombre de la categoría.
 typedef ManageKey = ({ContentType type, String group});
 

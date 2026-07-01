@@ -6,6 +6,7 @@ import '../app/providers.dart';
 import '../domain/category.dart';
 import '../domain/media_item.dart';
 import '../player/media_kit_player_controller.dart';
+import 'channel_guide_screen.dart';
 import 'player_screen.dart';
 
 /// Ancho mínimo para mostrar el panel de preview lateral.
@@ -194,7 +195,17 @@ class _ChannelListScreenState extends ConsumerState<ChannelListScreen> {
             ],
           ),
         ),
-        const Divider(height: 24),
+        Align(
+          alignment: Alignment.centerLeft,
+          child: TextButton.icon(
+            onPressed: () => Navigator.of(context).push(MaterialPageRoute(
+              builder: (_) => ChannelGuideScreen(channel: sel),
+            )),
+            icon: const Icon(Icons.calendar_month, size: 18),
+            label: const Text('Guía completa'),
+          ),
+        ),
+        const Divider(height: 8),
         Expanded(child: _epgSection(sel)),
       ],
     );
