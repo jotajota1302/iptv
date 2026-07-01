@@ -5,6 +5,7 @@ import '../domain/category.dart';
 import '../domain/content_type.dart';
 import 'continue_watching_row.dart';
 import 'movie_grid_screen.dart';
+import 'widgets/category_tile.dart';
 
 class MoviesTab extends ConsumerWidget {
   const MoviesTab({super.key});
@@ -37,7 +38,7 @@ class MoviesTab extends ConsumerWidget {
         ),
         Expanded(
           child: async.when(
-            loading: () => const Center(child: CircularProgressIndicator()),
+            loading: () => const CategoryListSkeleton(),
             error: (e, _) => Center(child: Text('Error: $e')),
             data: (cats) {
               if (cats.isEmpty) {
@@ -48,28 +49,12 @@ class MoviesTab extends ConsumerWidget {
                 children: [
                   const ContinueWatchingRow(type: ContentType.movie),
                   for (final cat in cats)
-                    ListTile(
-                      leading: const Icon(Icons.movie),
-                      title: Text(cat.name),
-                      trailing: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text('${cat.itemCount}'),
-                          PopupMenuButton<String>(
-                            onSelected: (a) {
-                              if (a == 'ocultar') _hide(ref, cat);
-                            },
-                            itemBuilder: (_) => const [
-                              PopupMenuItem(
-                                  value: 'ocultar',
-                                  child: ListTile(
-                                      leading: Icon(Icons.visibility_off),
-                                      title: Text('Ocultar categoría'))),
-                            ],
-                          ),
-                        ],
-                      ),
+                    CategoryTile(
+                      icon: Icons.movie_outlined,
+                      name: cat.name,
+                      count: cat.itemCount,
                       onTap: () => _open(context, cat),
+                      onHide: () => _hide(ref, cat),
                     ),
                 ],
               );
