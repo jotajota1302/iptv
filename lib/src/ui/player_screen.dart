@@ -88,9 +88,11 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
 
   void _save() {
     if (!widget.resume) return;
-    ref
-        .read(playlistRepositoryProvider)
-        .saveProgress(widget.item.id, _positionSeconds);
+    ref.read(playlistRepositoryProvider).saveProgress(
+          widget.item.id,
+          _positionSeconds,
+          duration: _duration.inSeconds,
+        );
   }
 
   String _audioLabel(AudioTrack t) {

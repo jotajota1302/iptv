@@ -86,28 +86,51 @@ void main() {
     expect(a.name, 'A nuevo', reason: 'datos actualizados');
   });
 
-  test('setPosition/getPosition guardan y devuelven la posicion', () async {
+  test('setProgress/getPosition guardan y devuelven la posicion', () async {
     await db.replaceItems([
       const MediaItem(
           id: 'm1', name: 'Peli', streamUrl: 'u1', type: ContentType.movie),
     ]);
     expect(await db.getPosition('m1'), 0);
-    await db.setPosition('m1', 754);
+    await db.setProgress('m1', 754, 6000, 111);
     expect(await db.getPosition('m1'), 754);
     expect(await db.getPosition('inexistente'), 0);
   });
 
-  test('replaceItems preserva positionSeconds por id', () async {
+  test('replaceItems preserva progreso por id', () async {
     await db.replaceItems([
       const MediaItem(
           id: 'm1', name: 'Peli', streamUrl: 'u1', type: ContentType.movie),
     ]);
-    await db.setPosition('m1', 900);
+    await db.setProgress('m1', 900, 6000, 111);
     await db.replaceItems([
       const MediaItem(
           id: 'm1', name: 'Peli v2', streamUrl: 'u1', type: ContentType.movie),
     ]);
     expect(await db.getPosition('m1'), 900);
+    final m = (await db.manageableByType(ContentType.movie)).single;
+    expect(m.durationSeconds, 6000);
+  });
+
+  test('itemsInProgress: solo VOD empezado y no terminado, reciente primero',
+      () async {
+    await db.replaceItems([
+      const MediaItem(
+          id: 'peli', name: 'Peli', streamUrl: 'u1', type: ContentType.movie),
+      const MediaItem(
+          id: 'serie', name: 'Serie', streamUrl: 'u2', type: ContentType.series),
+      const MediaItem(
+          id: 'fin', name: 'Fin', streamUrl: 'u3', type: ContentType.movie),
+      const MediaItem(
+          id: 'tv', name: 'TV', streamUrl: 'u4', type: ContentType.live),
+    ]);
+    await db.setProgress('peli', 100, 6000, 200); // en progreso
+    await db.setProgress('serie', 50, 3000, 300); // en progreso (más reciente)
+    await db.setProgress('fin', 5990, 6000, 100); // casi terminada -> fuera
+    await db.setProgress('tv', 100, 0, 400); // live -> fuera
+
+    final list = await db.itemsInProgress();
+    expect(list.map((e) => e.id), ['serie', 'peli']);
   });
 
   test('hiddenCountByCategory cuenta ocultos y borrados por categoria', () async {

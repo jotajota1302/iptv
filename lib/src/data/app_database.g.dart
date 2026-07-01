@@ -134,6 +134,30 @@ class $ItemsTable extends Items with TableInfo<$ItemsTable, Item> {
     requiredDuringInsert: false,
     defaultValue: const Constant(0),
   );
+  static const VerificationMeta _durationSecondsMeta = const VerificationMeta(
+    'durationSeconds',
+  );
+  @override
+  late final GeneratedColumn<int> durationSeconds = GeneratedColumn<int>(
+    'duration_seconds',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
+  static const VerificationMeta _lastWatchedAtMeta = const VerificationMeta(
+    'lastWatchedAt',
+  );
+  @override
+  late final GeneratedColumn<int> lastWatchedAt = GeneratedColumn<int>(
+    'last_watched_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -147,6 +171,8 @@ class $ItemsTable extends Items with TableInfo<$ItemsTable, Item> {
     isHidden,
     isDeleted,
     positionSeconds,
+    durationSeconds,
+    lastWatchedAt,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -234,6 +260,24 @@ class $ItemsTable extends Items with TableInfo<$ItemsTable, Item> {
         ),
       );
     }
+    if (data.containsKey('duration_seconds')) {
+      context.handle(
+        _durationSecondsMeta,
+        durationSeconds.isAcceptableOrUnknown(
+          data['duration_seconds']!,
+          _durationSecondsMeta,
+        ),
+      );
+    }
+    if (data.containsKey('last_watched_at')) {
+      context.handle(
+        _lastWatchedAtMeta,
+        lastWatchedAt.isAcceptableOrUnknown(
+          data['last_watched_at']!,
+          _lastWatchedAtMeta,
+        ),
+      );
+    }
     return context;
   }
 
@@ -287,6 +331,14 @@ class $ItemsTable extends Items with TableInfo<$ItemsTable, Item> {
         DriftSqlType.int,
         data['${effectivePrefix}position_seconds'],
       )!,
+      durationSeconds: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}duration_seconds'],
+      )!,
+      lastWatchedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}last_watched_at'],
+      )!,
     );
   }
 
@@ -308,6 +360,8 @@ class Item extends DataClass implements Insertable<Item> {
   final bool isHidden;
   final bool isDeleted;
   final int positionSeconds;
+  final int durationSeconds;
+  final int lastWatchedAt;
   const Item({
     required this.id,
     required this.name,
@@ -320,6 +374,8 @@ class Item extends DataClass implements Insertable<Item> {
     required this.isHidden,
     required this.isDeleted,
     required this.positionSeconds,
+    required this.durationSeconds,
+    required this.lastWatchedAt,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -341,6 +397,8 @@ class Item extends DataClass implements Insertable<Item> {
     map['is_hidden'] = Variable<bool>(isHidden);
     map['is_deleted'] = Variable<bool>(isDeleted);
     map['position_seconds'] = Variable<int>(positionSeconds);
+    map['duration_seconds'] = Variable<int>(durationSeconds);
+    map['last_watched_at'] = Variable<int>(lastWatchedAt);
     return map;
   }
 
@@ -363,6 +421,8 @@ class Item extends DataClass implements Insertable<Item> {
       isHidden: Value(isHidden),
       isDeleted: Value(isDeleted),
       positionSeconds: Value(positionSeconds),
+      durationSeconds: Value(durationSeconds),
+      lastWatchedAt: Value(lastWatchedAt),
     );
   }
 
@@ -383,6 +443,8 @@ class Item extends DataClass implements Insertable<Item> {
       isHidden: serializer.fromJson<bool>(json['isHidden']),
       isDeleted: serializer.fromJson<bool>(json['isDeleted']),
       positionSeconds: serializer.fromJson<int>(json['positionSeconds']),
+      durationSeconds: serializer.fromJson<int>(json['durationSeconds']),
+      lastWatchedAt: serializer.fromJson<int>(json['lastWatchedAt']),
     );
   }
   @override
@@ -400,6 +462,8 @@ class Item extends DataClass implements Insertable<Item> {
       'isHidden': serializer.toJson<bool>(isHidden),
       'isDeleted': serializer.toJson<bool>(isDeleted),
       'positionSeconds': serializer.toJson<int>(positionSeconds),
+      'durationSeconds': serializer.toJson<int>(durationSeconds),
+      'lastWatchedAt': serializer.toJson<int>(lastWatchedAt),
     };
   }
 
@@ -415,6 +479,8 @@ class Item extends DataClass implements Insertable<Item> {
     bool? isHidden,
     bool? isDeleted,
     int? positionSeconds,
+    int? durationSeconds,
+    int? lastWatchedAt,
   }) => Item(
     id: id ?? this.id,
     name: name ?? this.name,
@@ -427,6 +493,8 @@ class Item extends DataClass implements Insertable<Item> {
     isHidden: isHidden ?? this.isHidden,
     isDeleted: isDeleted ?? this.isDeleted,
     positionSeconds: positionSeconds ?? this.positionSeconds,
+    durationSeconds: durationSeconds ?? this.durationSeconds,
+    lastWatchedAt: lastWatchedAt ?? this.lastWatchedAt,
   );
   Item copyWithCompanion(ItemsCompanion data) {
     return Item(
@@ -447,6 +515,12 @@ class Item extends DataClass implements Insertable<Item> {
       positionSeconds: data.positionSeconds.present
           ? data.positionSeconds.value
           : this.positionSeconds,
+      durationSeconds: data.durationSeconds.present
+          ? data.durationSeconds.value
+          : this.durationSeconds,
+      lastWatchedAt: data.lastWatchedAt.present
+          ? data.lastWatchedAt.value
+          : this.lastWatchedAt,
     );
   }
 
@@ -463,7 +537,9 @@ class Item extends DataClass implements Insertable<Item> {
           ..write('isFavorite: $isFavorite, ')
           ..write('isHidden: $isHidden, ')
           ..write('isDeleted: $isDeleted, ')
-          ..write('positionSeconds: $positionSeconds')
+          ..write('positionSeconds: $positionSeconds, ')
+          ..write('durationSeconds: $durationSeconds, ')
+          ..write('lastWatchedAt: $lastWatchedAt')
           ..write(')'))
         .toString();
   }
@@ -481,6 +557,8 @@ class Item extends DataClass implements Insertable<Item> {
     isHidden,
     isDeleted,
     positionSeconds,
+    durationSeconds,
+    lastWatchedAt,
   );
   @override
   bool operator ==(Object other) =>
@@ -496,7 +574,9 @@ class Item extends DataClass implements Insertable<Item> {
           other.isFavorite == this.isFavorite &&
           other.isHidden == this.isHidden &&
           other.isDeleted == this.isDeleted &&
-          other.positionSeconds == this.positionSeconds);
+          other.positionSeconds == this.positionSeconds &&
+          other.durationSeconds == this.durationSeconds &&
+          other.lastWatchedAt == this.lastWatchedAt);
 }
 
 class ItemsCompanion extends UpdateCompanion<Item> {
@@ -511,6 +591,8 @@ class ItemsCompanion extends UpdateCompanion<Item> {
   final Value<bool> isHidden;
   final Value<bool> isDeleted;
   final Value<int> positionSeconds;
+  final Value<int> durationSeconds;
+  final Value<int> lastWatchedAt;
   final Value<int> rowid;
   const ItemsCompanion({
     this.id = const Value.absent(),
@@ -524,6 +606,8 @@ class ItemsCompanion extends UpdateCompanion<Item> {
     this.isHidden = const Value.absent(),
     this.isDeleted = const Value.absent(),
     this.positionSeconds = const Value.absent(),
+    this.durationSeconds = const Value.absent(),
+    this.lastWatchedAt = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   ItemsCompanion.insert({
@@ -538,6 +622,8 @@ class ItemsCompanion extends UpdateCompanion<Item> {
     this.isHidden = const Value.absent(),
     this.isDeleted = const Value.absent(),
     this.positionSeconds = const Value.absent(),
+    this.durationSeconds = const Value.absent(),
+    this.lastWatchedAt = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
        name = Value(name),
@@ -555,6 +641,8 @@ class ItemsCompanion extends UpdateCompanion<Item> {
     Expression<bool>? isHidden,
     Expression<bool>? isDeleted,
     Expression<int>? positionSeconds,
+    Expression<int>? durationSeconds,
+    Expression<int>? lastWatchedAt,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -569,6 +657,8 @@ class ItemsCompanion extends UpdateCompanion<Item> {
       if (isHidden != null) 'is_hidden': isHidden,
       if (isDeleted != null) 'is_deleted': isDeleted,
       if (positionSeconds != null) 'position_seconds': positionSeconds,
+      if (durationSeconds != null) 'duration_seconds': durationSeconds,
+      if (lastWatchedAt != null) 'last_watched_at': lastWatchedAt,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -585,6 +675,8 @@ class ItemsCompanion extends UpdateCompanion<Item> {
     Value<bool>? isHidden,
     Value<bool>? isDeleted,
     Value<int>? positionSeconds,
+    Value<int>? durationSeconds,
+    Value<int>? lastWatchedAt,
     Value<int>? rowid,
   }) {
     return ItemsCompanion(
@@ -599,6 +691,8 @@ class ItemsCompanion extends UpdateCompanion<Item> {
       isHidden: isHidden ?? this.isHidden,
       isDeleted: isDeleted ?? this.isDeleted,
       positionSeconds: positionSeconds ?? this.positionSeconds,
+      durationSeconds: durationSeconds ?? this.durationSeconds,
+      lastWatchedAt: lastWatchedAt ?? this.lastWatchedAt,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -639,6 +733,12 @@ class ItemsCompanion extends UpdateCompanion<Item> {
     if (positionSeconds.present) {
       map['position_seconds'] = Variable<int>(positionSeconds.value);
     }
+    if (durationSeconds.present) {
+      map['duration_seconds'] = Variable<int>(durationSeconds.value);
+    }
+    if (lastWatchedAt.present) {
+      map['last_watched_at'] = Variable<int>(lastWatchedAt.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -659,6 +759,8 @@ class ItemsCompanion extends UpdateCompanion<Item> {
           ..write('isHidden: $isHidden, ')
           ..write('isDeleted: $isDeleted, ')
           ..write('positionSeconds: $positionSeconds, ')
+          ..write('durationSeconds: $durationSeconds, ')
+          ..write('lastWatchedAt: $lastWatchedAt, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -689,6 +791,8 @@ typedef $$ItemsTableCreateCompanionBuilder =
       Value<bool> isHidden,
       Value<bool> isDeleted,
       Value<int> positionSeconds,
+      Value<int> durationSeconds,
+      Value<int> lastWatchedAt,
       Value<int> rowid,
     });
 typedef $$ItemsTableUpdateCompanionBuilder =
@@ -704,6 +808,8 @@ typedef $$ItemsTableUpdateCompanionBuilder =
       Value<bool> isHidden,
       Value<bool> isDeleted,
       Value<int> positionSeconds,
+      Value<int> durationSeconds,
+      Value<int> lastWatchedAt,
       Value<int> rowid,
     });
 
@@ -767,6 +873,16 @@ class $$ItemsTableFilterComposer extends Composer<_$AppDatabase, $ItemsTable> {
 
   ColumnFilters<int> get positionSeconds => $composableBuilder(
     column: $table.positionSeconds,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get durationSeconds => $composableBuilder(
+    column: $table.durationSeconds,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get lastWatchedAt => $composableBuilder(
+    column: $table.lastWatchedAt,
     builder: (column) => ColumnFilters(column),
   );
 }
@@ -834,6 +950,16 @@ class $$ItemsTableOrderingComposer
     column: $table.positionSeconds,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<int> get durationSeconds => $composableBuilder(
+    column: $table.durationSeconds,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get lastWatchedAt => $composableBuilder(
+    column: $table.lastWatchedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
 class $$ItemsTableAnnotationComposer
@@ -883,6 +1009,16 @@ class $$ItemsTableAnnotationComposer
     column: $table.positionSeconds,
     builder: (column) => column,
   );
+
+  GeneratedColumn<int> get durationSeconds => $composableBuilder(
+    column: $table.durationSeconds,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get lastWatchedAt => $composableBuilder(
+    column: $table.lastWatchedAt,
+    builder: (column) => column,
+  );
 }
 
 class $$ItemsTableTableManager
@@ -924,6 +1060,8 @@ class $$ItemsTableTableManager
                 Value<bool> isHidden = const Value.absent(),
                 Value<bool> isDeleted = const Value.absent(),
                 Value<int> positionSeconds = const Value.absent(),
+                Value<int> durationSeconds = const Value.absent(),
+                Value<int> lastWatchedAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => ItemsCompanion(
                 id: id,
@@ -937,6 +1075,8 @@ class $$ItemsTableTableManager
                 isHidden: isHidden,
                 isDeleted: isDeleted,
                 positionSeconds: positionSeconds,
+                durationSeconds: durationSeconds,
+                lastWatchedAt: lastWatchedAt,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -952,6 +1092,8 @@ class $$ItemsTableTableManager
                 Value<bool> isHidden = const Value.absent(),
                 Value<bool> isDeleted = const Value.absent(),
                 Value<int> positionSeconds = const Value.absent(),
+                Value<int> durationSeconds = const Value.absent(),
+                Value<int> lastWatchedAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => ItemsCompanion.insert(
                 id: id,
@@ -965,6 +1107,8 @@ class $$ItemsTableTableManager
                 isHidden: isHidden,
                 isDeleted: isDeleted,
                 positionSeconds: positionSeconds,
+                durationSeconds: durationSeconds,
+                lastWatchedAt: lastWatchedAt,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0

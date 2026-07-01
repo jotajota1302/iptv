@@ -102,10 +102,38 @@ class PlaylistRepository {
         .toList();
   }
 
-  /// Guarda la posición de reproducción (segundos) para reanudar.
-  Future<void> saveProgress(String id, int seconds) =>
-      _db.setPosition(id, seconds);
+  /// Guarda el progreso (posición + duración) para reanudar y "Continuar viendo".
+  Future<void> saveProgress(String id, int seconds, {int duration = 0}) => _db
+      .setProgress(id, seconds, duration, DateTime.now().millisecondsSinceEpoch);
 
   /// Posición de reproducción guardada (segundos) de un item.
   Future<int> progress(String id) => _db.getPosition(id);
+
+  /// Películas/series empezadas y sin terminar (más recientes primero).
+  Future<List<MediaItem>> continueWatching() => _db.itemsInProgress();
+
+  // --- Gestión VOD (ocultar/borrar por tipo, igual que en TV) ---
+
+  Future<void> hideCategoryOf(ContentType type, String group) =>
+      _db.hideCategory(type, group);
+
+  Future<void> restoreCategoryOf(ContentType type, String group) =>
+      _db.restoreCategory(type, group);
+
+  /// Categorías de un tipo para gestión (incluye ocultas).
+  Future<List<Category>> manageCategoriesOf(ContentType type) =>
+      _db.categoriesByType(type, onlyVisible: false);
+
+  /// Nº de items ocultos/borrados por categoría de un tipo.
+  Future<Map<String, int>> hiddenCountsOf(ContentType type) =>
+      _db.hiddenCountByCategory(type);
+
+  /// Todos los items de una categoría de un tipo, con su estado (para gestión).
+  Future<List<MediaItem>> manageByCategory(
+      ContentType type, String group) async {
+    final all = await _db.manageableByType(type);
+    return all
+        .where((i) => (i.groupTitle ?? 'Sin categoria') == group)
+        .toList();
+  }
 }
