@@ -166,6 +166,20 @@ class AppDatabase extends _$AppDatabase {
           const ItemsCompanion(
               isHidden: Value(false), isDeleted: Value(false)));
 
+  /// Nº de canales ocultos o borrados por categoría (para señalizar en gestión).
+  Future<Map<String, int>> hiddenCountByCategory(ContentType type) async {
+    final rows = await (select(items)
+          ..where((t) =>
+              t.type.equals(type.index) & (t.isHidden | t.isDeleted)))
+        .get();
+    final counts = <String, int>{};
+    for (final r in rows) {
+      final g = r.groupTitle ?? 'Sin categoria';
+      counts[g] = (counts[g] ?? 0) + 1;
+    }
+    return counts;
+  }
+
   Future<List<MediaItem>> favorites() async {
     final rows = await (select(items)
           ..where((t) => t.isFavorite.equals(true) & _visible(t)))

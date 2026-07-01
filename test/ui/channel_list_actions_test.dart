@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:iptv_player/src/app/providers.dart';
 import 'package:iptv_player/src/data/playlist_repository.dart';
 import 'package:iptv_player/src/domain/category.dart';
@@ -20,10 +21,13 @@ void main() {
         id: 'a', name: 'La 1', streamUrl: 'u', type: ContentType.live);
     final repo = _MockRepo();
     when(() => repo.hideItem(any())).thenAnswer((_) async {});
+    SharedPreferences.setMockInitialValues({});
+    final prefs = await SharedPreferences.getInstance();
 
     await tester.pumpWidget(ProviderScope(
       overrides: [
         playlistRepositoryProvider.overrideWithValue(repo),
+        sharedPrefsProvider.overrideWithValue(prefs),
         liveByCategoryProvider('Nacionales')
             .overrideWith((ref) async => [item]),
       ],

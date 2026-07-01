@@ -68,6 +68,10 @@ class PlaylistRepository {
   Future<List<Category>> manageCategories() =>
       _db.categoriesByType(ContentType.live, onlyVisible: false);
 
+  /// Nº de canales ocultos/borrados por categoría en directo.
+  Future<Map<String, int>> liveHiddenCounts() =>
+      _db.hiddenCountByCategory(ContentType.live);
+
   /// Todos los canales en directo de una categoría, con su estado.
   Future<List<MediaItem>> manageLiveByCategory(String group) async {
     final all = await _db.manageableByType(ContentType.live);

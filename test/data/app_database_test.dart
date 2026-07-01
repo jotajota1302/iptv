@@ -85,4 +85,32 @@ void main() {
     expect(a.isHidden, true, reason: 'oculto preservado');
     expect(a.name, 'A nuevo', reason: 'datos actualizados');
   });
+
+  test('hiddenCountByCategory cuenta ocultos y borrados por categoria', () async {
+    await db.replaceItems([
+      const MediaItem(
+          id: 'a',
+          name: 'A',
+          streamUrl: 'u1',
+          groupTitle: 'Deportes',
+          type: ContentType.live),
+      const MediaItem(
+          id: 'b',
+          name: 'B',
+          streamUrl: 'u2',
+          groupTitle: 'Deportes',
+          type: ContentType.live),
+      const MediaItem(
+          id: 'c',
+          name: 'C',
+          streamUrl: 'u3',
+          groupTitle: 'Cine TV',
+          type: ContentType.live),
+    ]);
+    await db.setHidden('a', true);
+    await db.setDeleted('b', true);
+    final counts = await db.hiddenCountByCategory(ContentType.live);
+    expect(counts['Deportes'], 2);
+    expect(counts.containsKey('Cine TV'), false);
+  });
 }

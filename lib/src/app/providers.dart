@@ -89,3 +89,17 @@ final manageLiveByCategoryProvider =
     FutureProvider.family<List<MediaItem>, String>((ref, group) {
   return ref.watch(playlistRepositoryProvider).manageLiveByCategory(group);
 });
+
+/// Nº de canales ocultos/borrados por categoría (para señalizar en gestión).
+final hiddenCountsProvider = FutureProvider<Map<String, int>>((ref) {
+  return ref.watch(playlistRepositoryProvider).liveHiddenCounts();
+});
+
+/// Vista en cuadrícula (iconos) vs lista en la pantalla de canales. Persistido.
+final channelGridProvider = StateProvider<bool>(
+    (ref) => ref.watch(sharedPrefsProvider).getBool('channel_grid') ?? false);
+
+void setChannelGrid(WidgetRef ref, bool value) {
+  ref.read(channelGridProvider.notifier).state = value;
+  ref.read(sharedPrefsProvider).setBool('channel_grid', value);
+}
