@@ -35,6 +35,10 @@ final searchResultsProvider = FutureProvider<List<MediaItem>>((ref) {
 
 final loadStateProvider = StateProvider<String?>((_) => null);
 
+/// Aceleración por hardware del vídeo (GPU). Si hay artefactos (triángulos,
+/// bloques) en HD/4K, desactivarla fuerza decodificación por software.
+final hardwareAccelProvider = StateProvider<bool>((_) => true);
+
 final liveByCategoryProvider =
     FutureProvider.family<List<MediaItem>, String>((ref, group) {
   return ref.watch(playlistRepositoryProvider).liveByCategory(group);

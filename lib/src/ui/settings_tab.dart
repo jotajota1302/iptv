@@ -38,6 +38,7 @@ class _SettingsTabState extends ConsumerState<SettingsTab> {
   Widget build(BuildContext context) {
     final repo = ref.watch(playlistRepositoryProvider);
     final status = ref.watch(loadStateProvider);
+    final hwAccel = ref.watch(hardwareAccelProvider);
     return Padding(
       padding: const EdgeInsets.all(16),
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
@@ -78,6 +79,19 @@ class _SettingsTabState extends ConsumerState<SettingsTab> {
             padding: const EdgeInsets.only(top: 12),
             child: Text(status),
           ),
+        const SizedBox(height: 24),
+        const Divider(),
+        const Text('Reproducción', style: TextStyle(fontSize: 20)),
+        SwitchListTile(
+          contentPadding: EdgeInsets.zero,
+          title: const Text('Aceleración por hardware (GPU)'),
+          subtitle: const Text(
+              'Si ves triángulos o bloques en vídeo HD/4K, desactívala '
+              '(usa más CPU pero corrige artefactos). Aplica al abrir el vídeo.'),
+          value: hwAccel,
+          onChanged: (v) =>
+              ref.read(hardwareAccelProvider.notifier).state = v,
+        ),
       ]),
     );
   }
