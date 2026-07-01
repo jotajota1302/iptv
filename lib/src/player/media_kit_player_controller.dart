@@ -24,10 +24,16 @@ class MediaKitPlayerController implements PlayerController {
 
   /// Activa/desactiva el desentrelazado de mpv. Corrige el efecto "peine"
   /// (líneas paralelas) en contenido entrelazado como la TV en directo.
+  ///
+  /// Usa el filtro de vídeo `bwdif` (software), que requiere decodificación por
+  /// software: con hwdec activo los fotogramas están en la GPU y el filtro no se
+  /// aplica. Por eso [PlayerScreen] fuerza decodificación por software cuando el
+  /// desentrelazado está activado.
   Future<void> setDeinterlace(bool enabled) async {
     final platform = player.platform;
     if (platform is NativePlayer) {
       await platform.setProperty('deinterlace', enabled ? 'yes' : 'no');
+      await platform.setProperty('vf', enabled ? 'bwdif' : '');
     }
   }
 

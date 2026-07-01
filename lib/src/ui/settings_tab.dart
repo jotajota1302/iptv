@@ -90,8 +90,7 @@ class _SettingsTabState extends ConsumerState<SettingsTab> {
               'Si ves triángulos o bloques en vídeo HD/4K, desactívala '
               '(usa más CPU pero corrige artefactos). Aplica al abrir el vídeo.'),
           value: hwAccel,
-          onChanged: (v) =>
-              ref.read(hardwareAccelProvider.notifier).state = v,
+          onChanged: (v) => setHardwareAccel(ref, v),
         ),
         SwitchListTile(
           contentPadding: EdgeInsets.zero,
@@ -100,8 +99,7 @@ class _SettingsTabState extends ConsumerState<SettingsTab> {
               'Corrige las "líneas peine" en TV en directo entrelazada '
               '(1080i/576i). Recomendado activado. Aplica al abrir el vídeo.'),
           value: deinterlace,
-          onChanged: (v) =>
-              ref.read(deinterlaceProvider.notifier).state = v,
+          onChanged: (v) => setDeinterlaceSetting(ref, v),
         ),
       ]),
     );

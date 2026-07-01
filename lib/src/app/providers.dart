@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/legacy.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../data/app_database.dart';
 import '../data/m3u_source.dart';
 import '../data/playlist_repository.dart';
@@ -35,13 +36,36 @@ final searchResultsProvider = FutureProvider<List<MediaItem>>((ref) {
 
 final loadStateProvider = StateProvider<String?>((_) => null);
 
+/// Instancia de SharedPreferences. Se inyecta en `main()` con override.
+final sharedPrefsProvider = Provider<SharedPreferences>(
+    (_) => throw UnimplementedError('sharedPrefsProvider debe sobrescribirse'));
+
+const _kHwAccel = 'hardware_accel';
+const _kDeinterlace = 'deinterlace';
+
 /// Aceleración por hardware del vídeo (GPU). Si hay artefactos (triángulos,
 /// bloques) en HD/4K, desactivarla fuerza decodificación por software.
-final hardwareAccelProvider = StateProvider<bool>((_) => true);
+/// Valor inicial persistido en SharedPreferences.
+final hardwareAccelProvider = StateProvider<bool>(
+    (ref) => ref.watch(sharedPrefsProvider).getBool(_kHwAccel) ?? true);
 
 /// Desentrelazado (deinterlace). La TV en directo suele emitir entrelazada
 /// (1080i/576i) y sin esto se ven "líneas peine" en bordes y movimiento.
-final deinterlaceProvider = StateProvider<bool>((_) => true);
+/// Valor inicial persistido en SharedPreferences.
+final deinterlaceProvider = StateProvider<bool>(
+    (ref) => ref.watch(sharedPrefsProvider).getBool(_kDeinterlace) ?? true);
+
+/// Persiste el valor de aceleración por hardware y actualiza el estado.
+void setHardwareAccel(WidgetRef ref, bool value) {
+  ref.read(hardwareAccelProvider.notifier).state = value;
+  ref.read(sharedPrefsProvider).setBool(_kHwAccel, value);
+}
+
+/// Persiste el valor de desentrelazado y actualiza el estado.
+void setDeinterlaceSetting(WidgetRef ref, bool value) {
+  ref.read(deinterlaceProvider.notifier).state = value;
+  ref.read(sharedPrefsProvider).setBool(_kDeinterlace, value);
+}
 
 final liveByCategoryProvider =
     FutureProvider.family<List<MediaItem>, String>((ref, group) {
