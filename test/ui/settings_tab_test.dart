@@ -22,8 +22,9 @@ void main() {
       ],
       child: const MaterialApp(home: Scaffold(body: SettingsTab())),
     ));
-    await tester.enterText(find.byType(TextField), 'http://x/list.m3u');
-    await tester.tap(find.text('Cargar URL'));
+    await tester.enterText(
+        find.widgetWithText(TextField, 'URL de la lista'), 'http://x/list.m3u');
+    await tester.tap(find.text('Añadir y cargar'));
     await tester.pump();
     verify(() => repo.loadFromUrl('http://x/list.m3u')).called(1);
   });

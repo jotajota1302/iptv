@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/legacy.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'playlists_controller.dart';
 import '../data/app_database.dart';
 import '../data/m3u_source.dart';
 import '../data/playlist_repository.dart';
@@ -35,6 +36,12 @@ final searchResultsProvider = FutureProvider<List<MediaItem>>((ref) {
 });
 
 final loadStateProvider = StateProvider<String?>((_) => null);
+
+/// Listas IPTV guardadas y cuál está activa (persistidas en prefs).
+final playlistsProvider =
+    StateNotifierProvider<PlaylistsNotifier, PlaylistsState>((ref) {
+  return PlaylistsNotifier(ref.watch(sharedPrefsProvider));
+});
 
 /// Instancia de SharedPreferences. Se inyecta en `main()` con override.
 final sharedPrefsProvider = Provider<SharedPreferences>(
