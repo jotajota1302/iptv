@@ -47,4 +47,24 @@ class PlaylistRepository {
 
   Future<void> toggleFavorite(MediaItem item) =>
       _db.setFavorite(item.id, !item.isFavorite);
+
+  // --- Gestión de canales ---
+
+  Future<void> hideItem(MediaItem item) => _db.setHidden(item.id, true);
+
+  Future<void> deleteItem(MediaItem item) => _db.setDeleted(item.id, true);
+
+  Future<void> restoreItem(MediaItem item) => _db.restore(item.id);
+
+  /// Categorías en directo para la pantalla de gestión (incluye ocultos).
+  Future<List<Category>> manageCategories() =>
+      _db.categoriesByType(ContentType.live, onlyVisible: false);
+
+  /// Todos los canales en directo de una categoría, con su estado.
+  Future<List<MediaItem>> manageLiveByCategory(String group) async {
+    final all = await _db.manageableByType(ContentType.live);
+    return all
+        .where((i) => (i.groupTitle ?? 'Sin categoria') == group)
+        .toList();
+  }
 }

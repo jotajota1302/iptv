@@ -71,3 +71,14 @@ final liveByCategoryProvider =
     FutureProvider.family<List<MediaItem>, String>((ref, group) {
   return ref.watch(playlistRepositoryProvider).liveByCategory(group);
 });
+
+/// Categorías en directo para la pantalla de gestión (incluye ocultos).
+final manageCategoriesProvider = FutureProvider<List<Category>>((ref) {
+  return ref.watch(playlistRepositoryProvider).manageCategories();
+});
+
+/// Todos los canales de una categoría (con su estado) para gestión.
+final manageLiveByCategoryProvider =
+    FutureProvider.family<List<MediaItem>, String>((ref, group) {
+  return ref.watch(playlistRepositoryProvider).manageLiveByCategory(group);
+});

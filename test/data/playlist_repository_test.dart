@@ -32,4 +32,23 @@ void main() {
     expect(live.single.type, ContentType.live);
     await db.close();
   });
+
+  test('hideItem oculta de navegacion pero sigue en gestion', () async {
+    final db = AppDatabase.forTesting(NativeDatabase.memory());
+    final source = _MockSource();
+    when(() => source.fetchFromUrl(any())).thenAnswer((_) async => _m3u);
+    final repo = PlaylistRepository(source, db);
+    await repo.loadFromUrl('http://x');
+
+    final canal = (await repo.liveByCategory('Nacionales')).single;
+    await repo.hideItem(canal);
+
+    expect(await repo.liveByCategory('Nacionales'), isEmpty);
+    final gestion = await repo.manageLiveByCategory('Nacionales');
+    expect(gestion.single.isHidden, true);
+
+    await repo.restoreItem(canal);
+    expect((await repo.liveByCategory('Nacionales')).length, 1);
+    await db.close();
+  });
 }

@@ -30,14 +30,47 @@ class ChannelListScreen extends ConsumerWidget {
                       errorWidget: (_, _, _) => const Icon(Icons.live_tv),
                     ),
               title: Text(it.name),
-              trailing: IconButton(
-                icon: Icon(
-                    it.isFavorite ? Icons.favorite : Icons.favorite_border),
-                onPressed: () async {
-                  await ref.read(playlistRepositoryProvider).toggleFavorite(it);
-                  ref.invalidate(liveByCategoryProvider(category.name));
-                  ref.invalidate(favoritesProvider);
-                },
+              trailing: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  IconButton(
+                    icon: Icon(it.isFavorite
+                        ? Icons.favorite
+                        : Icons.favorite_border),
+                    onPressed: () async {
+                      await ref
+                          .read(playlistRepositoryProvider)
+                          .toggleFavorite(it);
+                      ref.invalidate(liveByCategoryProvider(category.name));
+                      ref.invalidate(favoritesProvider);
+                    },
+                  ),
+                  PopupMenuButton<String>(
+                    onSelected: (action) async {
+                      final repo = ref.read(playlistRepositoryProvider);
+                      if (action == 'ocultar') {
+                        await repo.hideItem(it);
+                      } else if (action == 'borrar') {
+                        await repo.deleteItem(it);
+                      }
+                      ref.invalidate(liveByCategoryProvider(category.name));
+                      ref.invalidate(liveCategoriesProvider);
+                      ref.invalidate(favoritesProvider);
+                    },
+                    itemBuilder: (_) => const [
+                      PopupMenuItem(
+                          value: 'ocultar',
+                          child: ListTile(
+                              leading: Icon(Icons.visibility_off),
+                              title: Text('Ocultar'))),
+                      PopupMenuItem(
+                          value: 'borrar',
+                          child: ListTile(
+                              leading: Icon(Icons.delete_outline),
+                              title: Text('Borrar'))),
+                    ],
+                  ),
+                ],
               ),
               onTap: () => Navigator.of(context).push(
                 MaterialPageRoute(builder: (_) => PlayerScreen(item: it)),
