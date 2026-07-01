@@ -20,12 +20,14 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
   void initState() {
     super.initState();
     final hwAccel = ref.read(hardwareAccelProvider);
+    final deinterlace = ref.read(deinterlaceProvider);
     _video = VideoController(
       _ctrl.player,
       configuration:
           VideoControllerConfiguration(enableHardwareAcceleration: hwAccel),
     );
     _ctrl.open(widget.item.streamUrl);
+    _ctrl.setDeinterlace(deinterlace);
   }
 
   @override

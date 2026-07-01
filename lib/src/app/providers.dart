@@ -39,6 +39,10 @@ final loadStateProvider = StateProvider<String?>((_) => null);
 /// bloques) en HD/4K, desactivarla fuerza decodificación por software.
 final hardwareAccelProvider = StateProvider<bool>((_) => true);
 
+/// Desentrelazado (deinterlace). La TV en directo suele emitir entrelazada
+/// (1080i/576i) y sin esto se ven "líneas peine" en bordes y movimiento.
+final deinterlaceProvider = StateProvider<bool>((_) => true);
+
 final liveByCategoryProvider =
     FutureProvider.family<List<MediaItem>, String>((ref, group) {
   return ref.watch(playlistRepositoryProvider).liveByCategory(group);

@@ -22,6 +22,15 @@ class MediaKitPlayerController implements PlayerController {
   @override
   Future<void> open(String url) => player.open(Media(url));
 
+  /// Activa/desactiva el desentrelazado de mpv. Corrige el efecto "peine"
+  /// (líneas paralelas) en contenido entrelazado como la TV en directo.
+  Future<void> setDeinterlace(bool enabled) async {
+    final platform = player.platform;
+    if (platform is NativePlayer) {
+      await platform.setProperty('deinterlace', enabled ? 'yes' : 'no');
+    }
+  }
+
   @override
   Future<void> play() => player.play();
 

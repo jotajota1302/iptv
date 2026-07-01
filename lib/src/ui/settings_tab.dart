@@ -39,6 +39,7 @@ class _SettingsTabState extends ConsumerState<SettingsTab> {
     final repo = ref.watch(playlistRepositoryProvider);
     final status = ref.watch(loadStateProvider);
     final hwAccel = ref.watch(hardwareAccelProvider);
+    final deinterlace = ref.watch(deinterlaceProvider);
     return Padding(
       padding: const EdgeInsets.all(16),
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
@@ -91,6 +92,16 @@ class _SettingsTabState extends ConsumerState<SettingsTab> {
           value: hwAccel,
           onChanged: (v) =>
               ref.read(hardwareAccelProvider.notifier).state = v,
+        ),
+        SwitchListTile(
+          contentPadding: EdgeInsets.zero,
+          title: const Text('Desentrelazado (deinterlace)'),
+          subtitle: const Text(
+              'Corrige las "líneas peine" en TV en directo entrelazada '
+              '(1080i/576i). Recomendado activado. Aplica al abrir el vídeo.'),
+          value: deinterlace,
+          onChanged: (v) =>
+              ref.read(deinterlaceProvider.notifier).state = v,
         ),
       ]),
     );
