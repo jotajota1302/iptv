@@ -86,6 +86,30 @@ void main() {
     expect(a.name, 'A nuevo', reason: 'datos actualizados');
   });
 
+  test('setPosition/getPosition guardan y devuelven la posicion', () async {
+    await db.replaceItems([
+      const MediaItem(
+          id: 'm1', name: 'Peli', streamUrl: 'u1', type: ContentType.movie),
+    ]);
+    expect(await db.getPosition('m1'), 0);
+    await db.setPosition('m1', 754);
+    expect(await db.getPosition('m1'), 754);
+    expect(await db.getPosition('inexistente'), 0);
+  });
+
+  test('replaceItems preserva positionSeconds por id', () async {
+    await db.replaceItems([
+      const MediaItem(
+          id: 'm1', name: 'Peli', streamUrl: 'u1', type: ContentType.movie),
+    ]);
+    await db.setPosition('m1', 900);
+    await db.replaceItems([
+      const MediaItem(
+          id: 'm1', name: 'Peli v2', streamUrl: 'u1', type: ContentType.movie),
+    ]);
+    expect(await db.getPosition('m1'), 900);
+  });
+
   test('hiddenCountByCategory cuenta ocultos y borrados por categoria', () async {
     await db.replaceItems([
       const MediaItem(

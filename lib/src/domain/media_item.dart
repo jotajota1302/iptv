@@ -12,6 +12,9 @@ class MediaItem {
   final bool isHidden;
   final bool isDeleted;
 
+  /// Segundos de reproducción guardados para reanudar (VOD). 0 = desde el inicio.
+  final int positionSeconds;
+
   const MediaItem({
     required this.id,
     required this.name,
@@ -23,9 +26,14 @@ class MediaItem {
     this.isFavorite = false,
     this.isHidden = false,
     this.isDeleted = false,
+    this.positionSeconds = 0,
   });
 
-  MediaItem copyWith({bool? isFavorite, bool? isHidden, bool? isDeleted}) =>
+  MediaItem copyWith(
+          {bool? isFavorite,
+          bool? isHidden,
+          bool? isDeleted,
+          int? positionSeconds}) =>
       MediaItem(
         id: id,
         name: name,
@@ -37,5 +45,6 @@ class MediaItem {
         isFavorite: isFavorite ?? this.isFavorite,
         isHidden: isHidden ?? this.isHidden,
         isDeleted: isDeleted ?? this.isDeleted,
+        positionSeconds: positionSeconds ?? this.positionSeconds,
       );
 }

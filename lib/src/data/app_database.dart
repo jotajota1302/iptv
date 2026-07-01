@@ -20,6 +20,7 @@ class Items extends Table {
   BoolColumn get isFavorite => boolean().withDefault(const Constant(false))();
   BoolColumn get isHidden => boolean().withDefault(const Constant(false))();
   BoolColumn get isDeleted => boolean().withDefault(const Constant(false))();
+  IntColumn get positionSeconds => integer().withDefault(const Constant(0))();
 
   @override
   Set<Column> get primaryKey => {id};
@@ -31,7 +32,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(super.e);
 
   @override
-  int get schemaVersion => 2;
+  int get schemaVersion => 3;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -39,6 +40,9 @@ class AppDatabase extends _$AppDatabase {
           if (from < 2) {
             await m.addColumn(items, items.isHidden);
             await m.addColumn(items, items.isDeleted);
+          }
+          if (from < 3) {
+            await m.addColumn(items, items.positionSeconds);
           }
         },
       );
@@ -54,6 +58,7 @@ class AppDatabase extends _$AppDatabase {
         isFavorite: r.isFavorite,
         isHidden: r.isHidden,
         isDeleted: r.isDeleted,
+        positionSeconds: r.positionSeconds,
       );
 
   /// Reemplaza la caché preservando los flags de usuario (favorito/oculto/
@@ -62,7 +67,12 @@ class AppDatabase extends _$AppDatabase {
     final existing = await select(items).get();
     final flags = {
       for (final r in existing)
-        r.id: (fav: r.isFavorite, hidden: r.isHidden, deleted: r.isDeleted),
+        r.id: (
+          fav: r.isFavorite,
+          hidden: r.isHidden,
+          deleted: r.isDeleted,
+          pos: r.positionSeconds,
+        ),
     };
     await batch((b) {
       b.deleteWhere(items, (_) => const Constant(true));
@@ -81,6 +91,7 @@ class AppDatabase extends _$AppDatabase {
             isFavorite: Value(f?.fav ?? m.isFavorite),
             isHidden: Value(f?.hidden ?? m.isHidden),
             isDeleted: Value(f?.deleted ?? m.isDeleted),
+            positionSeconds: Value(f?.pos ?? m.positionSeconds),
           );
         }),
         mode: InsertMode.insertOrReplace,
@@ -178,6 +189,18 @@ class AppDatabase extends _$AppDatabase {
       counts[g] = (counts[g] ?? 0) + 1;
     }
     return counts;
+  }
+
+  /// Guarda la posición de reproducción (segundos) para reanudar VOD.
+  Future<void> setPosition(String id, int seconds) =>
+      (update(items)..where((t) => t.id.equals(id)))
+          .write(ItemsCompanion(positionSeconds: Value(seconds)));
+
+  /// Posición guardada (segundos) de un item, o 0 si no existe.
+  Future<int> getPosition(String id) async {
+    final row = await (select(items)..where((t) => t.id.equals(id)))
+        .getSingleOrNull();
+    return row?.positionSeconds ?? 0;
   }
 
   Future<List<MediaItem>> favorites() async {

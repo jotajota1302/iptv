@@ -122,6 +122,18 @@ class $ItemsTable extends Items with TableInfo<$ItemsTable, Item> {
     ),
     defaultValue: const Constant(false),
   );
+  static const VerificationMeta _positionSecondsMeta = const VerificationMeta(
+    'positionSeconds',
+  );
+  @override
+  late final GeneratedColumn<int> positionSeconds = GeneratedColumn<int>(
+    'position_seconds',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -134,6 +146,7 @@ class $ItemsTable extends Items with TableInfo<$ItemsTable, Item> {
     isFavorite,
     isHidden,
     isDeleted,
+    positionSeconds,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -212,6 +225,15 @@ class $ItemsTable extends Items with TableInfo<$ItemsTable, Item> {
         isDeleted.isAcceptableOrUnknown(data['is_deleted']!, _isDeletedMeta),
       );
     }
+    if (data.containsKey('position_seconds')) {
+      context.handle(
+        _positionSecondsMeta,
+        positionSeconds.isAcceptableOrUnknown(
+          data['position_seconds']!,
+          _positionSecondsMeta,
+        ),
+      );
+    }
     return context;
   }
 
@@ -261,6 +283,10 @@ class $ItemsTable extends Items with TableInfo<$ItemsTable, Item> {
         DriftSqlType.bool,
         data['${effectivePrefix}is_deleted'],
       )!,
+      positionSeconds: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}position_seconds'],
+      )!,
     );
   }
 
@@ -281,6 +307,7 @@ class Item extends DataClass implements Insertable<Item> {
   final bool isFavorite;
   final bool isHidden;
   final bool isDeleted;
+  final int positionSeconds;
   const Item({
     required this.id,
     required this.name,
@@ -292,6 +319,7 @@ class Item extends DataClass implements Insertable<Item> {
     required this.isFavorite,
     required this.isHidden,
     required this.isDeleted,
+    required this.positionSeconds,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -312,6 +340,7 @@ class Item extends DataClass implements Insertable<Item> {
     map['is_favorite'] = Variable<bool>(isFavorite);
     map['is_hidden'] = Variable<bool>(isHidden);
     map['is_deleted'] = Variable<bool>(isDeleted);
+    map['position_seconds'] = Variable<int>(positionSeconds);
     return map;
   }
 
@@ -333,6 +362,7 @@ class Item extends DataClass implements Insertable<Item> {
       isFavorite: Value(isFavorite),
       isHidden: Value(isHidden),
       isDeleted: Value(isDeleted),
+      positionSeconds: Value(positionSeconds),
     );
   }
 
@@ -352,6 +382,7 @@ class Item extends DataClass implements Insertable<Item> {
       isFavorite: serializer.fromJson<bool>(json['isFavorite']),
       isHidden: serializer.fromJson<bool>(json['isHidden']),
       isDeleted: serializer.fromJson<bool>(json['isDeleted']),
+      positionSeconds: serializer.fromJson<int>(json['positionSeconds']),
     );
   }
   @override
@@ -368,6 +399,7 @@ class Item extends DataClass implements Insertable<Item> {
       'isFavorite': serializer.toJson<bool>(isFavorite),
       'isHidden': serializer.toJson<bool>(isHidden),
       'isDeleted': serializer.toJson<bool>(isDeleted),
+      'positionSeconds': serializer.toJson<int>(positionSeconds),
     };
   }
 
@@ -382,6 +414,7 @@ class Item extends DataClass implements Insertable<Item> {
     bool? isFavorite,
     bool? isHidden,
     bool? isDeleted,
+    int? positionSeconds,
   }) => Item(
     id: id ?? this.id,
     name: name ?? this.name,
@@ -393,6 +426,7 @@ class Item extends DataClass implements Insertable<Item> {
     isFavorite: isFavorite ?? this.isFavorite,
     isHidden: isHidden ?? this.isHidden,
     isDeleted: isDeleted ?? this.isDeleted,
+    positionSeconds: positionSeconds ?? this.positionSeconds,
   );
   Item copyWithCompanion(ItemsCompanion data) {
     return Item(
@@ -410,6 +444,9 @@ class Item extends DataClass implements Insertable<Item> {
           : this.isFavorite,
       isHidden: data.isHidden.present ? data.isHidden.value : this.isHidden,
       isDeleted: data.isDeleted.present ? data.isDeleted.value : this.isDeleted,
+      positionSeconds: data.positionSeconds.present
+          ? data.positionSeconds.value
+          : this.positionSeconds,
     );
   }
 
@@ -425,7 +462,8 @@ class Item extends DataClass implements Insertable<Item> {
           ..write('type: $type, ')
           ..write('isFavorite: $isFavorite, ')
           ..write('isHidden: $isHidden, ')
-          ..write('isDeleted: $isDeleted')
+          ..write('isDeleted: $isDeleted, ')
+          ..write('positionSeconds: $positionSeconds')
           ..write(')'))
         .toString();
   }
@@ -442,6 +480,7 @@ class Item extends DataClass implements Insertable<Item> {
     isFavorite,
     isHidden,
     isDeleted,
+    positionSeconds,
   );
   @override
   bool operator ==(Object other) =>
@@ -456,7 +495,8 @@ class Item extends DataClass implements Insertable<Item> {
           other.type == this.type &&
           other.isFavorite == this.isFavorite &&
           other.isHidden == this.isHidden &&
-          other.isDeleted == this.isDeleted);
+          other.isDeleted == this.isDeleted &&
+          other.positionSeconds == this.positionSeconds);
 }
 
 class ItemsCompanion extends UpdateCompanion<Item> {
@@ -470,6 +510,7 @@ class ItemsCompanion extends UpdateCompanion<Item> {
   final Value<bool> isFavorite;
   final Value<bool> isHidden;
   final Value<bool> isDeleted;
+  final Value<int> positionSeconds;
   final Value<int> rowid;
   const ItemsCompanion({
     this.id = const Value.absent(),
@@ -482,6 +523,7 @@ class ItemsCompanion extends UpdateCompanion<Item> {
     this.isFavorite = const Value.absent(),
     this.isHidden = const Value.absent(),
     this.isDeleted = const Value.absent(),
+    this.positionSeconds = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   ItemsCompanion.insert({
@@ -495,6 +537,7 @@ class ItemsCompanion extends UpdateCompanion<Item> {
     this.isFavorite = const Value.absent(),
     this.isHidden = const Value.absent(),
     this.isDeleted = const Value.absent(),
+    this.positionSeconds = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
        name = Value(name),
@@ -511,6 +554,7 @@ class ItemsCompanion extends UpdateCompanion<Item> {
     Expression<bool>? isFavorite,
     Expression<bool>? isHidden,
     Expression<bool>? isDeleted,
+    Expression<int>? positionSeconds,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -524,6 +568,7 @@ class ItemsCompanion extends UpdateCompanion<Item> {
       if (isFavorite != null) 'is_favorite': isFavorite,
       if (isHidden != null) 'is_hidden': isHidden,
       if (isDeleted != null) 'is_deleted': isDeleted,
+      if (positionSeconds != null) 'position_seconds': positionSeconds,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -539,6 +584,7 @@ class ItemsCompanion extends UpdateCompanion<Item> {
     Value<bool>? isFavorite,
     Value<bool>? isHidden,
     Value<bool>? isDeleted,
+    Value<int>? positionSeconds,
     Value<int>? rowid,
   }) {
     return ItemsCompanion(
@@ -552,6 +598,7 @@ class ItemsCompanion extends UpdateCompanion<Item> {
       isFavorite: isFavorite ?? this.isFavorite,
       isHidden: isHidden ?? this.isHidden,
       isDeleted: isDeleted ?? this.isDeleted,
+      positionSeconds: positionSeconds ?? this.positionSeconds,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -589,6 +636,9 @@ class ItemsCompanion extends UpdateCompanion<Item> {
     if (isDeleted.present) {
       map['is_deleted'] = Variable<bool>(isDeleted.value);
     }
+    if (positionSeconds.present) {
+      map['position_seconds'] = Variable<int>(positionSeconds.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -608,6 +658,7 @@ class ItemsCompanion extends UpdateCompanion<Item> {
           ..write('isFavorite: $isFavorite, ')
           ..write('isHidden: $isHidden, ')
           ..write('isDeleted: $isDeleted, ')
+          ..write('positionSeconds: $positionSeconds, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -637,6 +688,7 @@ typedef $$ItemsTableCreateCompanionBuilder =
       Value<bool> isFavorite,
       Value<bool> isHidden,
       Value<bool> isDeleted,
+      Value<int> positionSeconds,
       Value<int> rowid,
     });
 typedef $$ItemsTableUpdateCompanionBuilder =
@@ -651,6 +703,7 @@ typedef $$ItemsTableUpdateCompanionBuilder =
       Value<bool> isFavorite,
       Value<bool> isHidden,
       Value<bool> isDeleted,
+      Value<int> positionSeconds,
       Value<int> rowid,
     });
 
@@ -709,6 +762,11 @@ class $$ItemsTableFilterComposer extends Composer<_$AppDatabase, $ItemsTable> {
 
   ColumnFilters<bool> get isDeleted => $composableBuilder(
     column: $table.isDeleted,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get positionSeconds => $composableBuilder(
+    column: $table.positionSeconds,
     builder: (column) => ColumnFilters(column),
   );
 }
@@ -771,6 +829,11 @@ class $$ItemsTableOrderingComposer
     column: $table.isDeleted,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<int> get positionSeconds => $composableBuilder(
+    column: $table.positionSeconds,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
 class $$ItemsTableAnnotationComposer
@@ -815,6 +878,11 @@ class $$ItemsTableAnnotationComposer
 
   GeneratedColumn<bool> get isDeleted =>
       $composableBuilder(column: $table.isDeleted, builder: (column) => column);
+
+  GeneratedColumn<int> get positionSeconds => $composableBuilder(
+    column: $table.positionSeconds,
+    builder: (column) => column,
+  );
 }
 
 class $$ItemsTableTableManager
@@ -855,6 +923,7 @@ class $$ItemsTableTableManager
                 Value<bool> isFavorite = const Value.absent(),
                 Value<bool> isHidden = const Value.absent(),
                 Value<bool> isDeleted = const Value.absent(),
+                Value<int> positionSeconds = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => ItemsCompanion(
                 id: id,
@@ -867,6 +936,7 @@ class $$ItemsTableTableManager
                 isFavorite: isFavorite,
                 isHidden: isHidden,
                 isDeleted: isDeleted,
+                positionSeconds: positionSeconds,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -881,6 +951,7 @@ class $$ItemsTableTableManager
                 Value<bool> isFavorite = const Value.absent(),
                 Value<bool> isHidden = const Value.absent(),
                 Value<bool> isDeleted = const Value.absent(),
+                Value<int> positionSeconds = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => ItemsCompanion.insert(
                 id: id,
@@ -893,6 +964,7 @@ class $$ItemsTableTableManager
                 isFavorite: isFavorite,
                 isHidden: isHidden,
                 isDeleted: isDeleted,
+                positionSeconds: positionSeconds,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0
