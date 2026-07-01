@@ -7,6 +7,7 @@ import '../domain/sort_mode.dart';
 import 'movie_detail_screen.dart';
 import 'sort_menu.dart';
 import 'vod_poster.dart';
+import 'widgets/content_rail.dart';
 
 /// Cuadrícula de carátulas de películas (poster 2:3) con buscador, progreso
 /// de "continuar viendo" y menú por película (favorito/ocultar/borrar).
@@ -94,7 +95,7 @@ class _MovieGridScreenState extends ConsumerState<MovieGridScreen> {
           ),
           Expanded(
             child: async.when(
-              loading: () => const Center(child: CircularProgressIndicator()),
+              loading: () => const PosterGridSkeleton(),
               error: (e, _) => Center(child: Text('Error: $e')),
               data: (all) {
                 final filtered = _query.isEmpty

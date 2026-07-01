@@ -67,6 +67,28 @@ class ContentRail extends StatelessWidget {
   }
 }
 
+/// Skeleton de cuadrícula de carátulas mientras carga.
+class PosterGridSkeleton extends StatelessWidget {
+  const PosterGridSkeleton({super.key});
+  @override
+  Widget build(BuildContext context) {
+    return Shimmer(
+      child: GridView.builder(
+        padding: const EdgeInsets.all(8),
+        physics: const NeverScrollableScrollPhysics(),
+        gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+          maxCrossAxisExtent: 140,
+          childAspectRatio: 0.6,
+          crossAxisSpacing: 8,
+          mainAxisSpacing: 8,
+        ),
+        itemCount: 12,
+        itemBuilder: (_, _) => const SkeletonBox(radius: 14),
+      ),
+    );
+  }
+}
+
 /// Skeleton de un rail mientras carga.
 class RailSkeleton extends StatelessWidget {
   final double itemWidth;

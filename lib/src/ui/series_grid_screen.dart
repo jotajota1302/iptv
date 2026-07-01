@@ -6,6 +6,7 @@ import '../domain/sort_mode.dart';
 import 'series_detail_screen.dart';
 import 'sort_menu.dart';
 import 'vod_poster.dart';
+import 'widgets/content_rail.dart';
 
 /// Cuadrícula de series (carátula + título) de una categoría, con buscador.
 /// Tocar abre el detalle con temporadas y episodios.
@@ -44,7 +45,7 @@ class _SeriesGridScreenState extends ConsumerState<SeriesGridScreen> {
           ),
           Expanded(
             child: async.when(
-              loading: () => const Center(child: CircularProgressIndicator()),
+              loading: () => const PosterGridSkeleton(),
               error: (e, _) => Center(child: Text('Error: $e')),
               data: (all) {
                 final filtered = _query.isEmpty

@@ -1,14 +1,15 @@
+import 'dart:ui';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../app/providers.dart';
+import '../app/theme.dart';
 import '../data/vod_info_service.dart';
 import '../domain/media_item.dart';
 import 'play_helpers.dart';
 
-/// Ficha de una película: carátula/fondo, sinopsis, año, género, valoración,
-/// reparto y botón de reproducir/continuar. Los metadatos se cargan de la API
-/// Xtream (best-effort); si no hay, se muestra igualmente lo básico.
+/// Ficha de película estilo cine: backdrop a pantalla con degradado, póster
+/// superpuesto, metadatos y sinopsis. Datos de la API Xtream (best-effort).
 class MovieDetailScreen extends ConsumerWidget {
   final MediaItem item;
   const MovieDetailScreen({super.key, required this.item});
@@ -23,93 +24,56 @@ class MovieDetailScreen extends ConsumerWidget {
     final infoAsync = ref.watch(vodInfoProvider(item.streamUrl));
     final info = infoAsync.value;
     final pos = item.positionSeconds;
-    final resumeLabel = pos > 5 ? 'Continuar (${_fmt(pos)})' : 'Reproducir';
-
-    Future<void> refreshAndPop() async {
-      ref.invalidate(favoritesProvider);
-      ref.invalidate(moviesByCategoryProvider(item.groupTitle ?? 'Sin categoria'));
-    }
+    final resumeLabel = pos > 5 ? 'Continuar · ${_fmt(pos)}' : 'Reproducir';
+    final cat = item.groupTitle ?? 'Sin categoria';
 
     return Scaffold(
-      appBar: AppBar(title: Text(item.name)),
-      body: ListView(
-        children: [
-          _Header(item: item, info: info),
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(item.name,
-                    style: const TextStyle(
-                        fontSize: 22, fontWeight: FontWeight.bold)),
-                const SizedBox(height: 8),
-                if (info != null)
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 4,
-                    children: [
-                      if (info.year != null) _chip(context, info.year!),
-                      if (info.genre != null) _chip(context, info.genre!),
-                      if (info.durationText != null)
-                        _chip(context, info.durationText!),
-                      if (info.rating != null)
-                        _chip(context, '⭐ ${info.rating}'),
-                    ],
-                  ),
-                const SizedBox(height: 16),
-                Row(
+      body: CustomScrollView(
+        slivers: [
+          SliverAppBar(
+            expandedHeight: 320,
+            pinned: true,
+            stretch: true,
+            backgroundColor: kBackground,
+            flexibleSpace: FlexibleSpaceBar(
+              background: _Backdrop(item: item, info: info),
+              stretchModes: const [StretchMode.zoomBackground],
+            ),
+          ),
+          SliverToBoxAdapter(
+            child: Transform.translate(
+              offset: const Offset(0, -48),
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    FilledButton.icon(
-                      onPressed: () async {
-                        await openPlayer(context, item);
-                        ref.invalidate(continueWatchingProvider);
-                        ref.invalidate(moviesByCategoryProvider(
-                            item.groupTitle ?? 'Sin categoria'));
-                      },
-                      icon: const Icon(Icons.play_arrow),
-                      label: Text(resumeLabel),
-                    ),
-                    const SizedBox(width: 8),
-                    IconButton(
-                      icon: Icon(item.isFavorite
-                          ? Icons.favorite
-                          : Icons.favorite_border),
-                      tooltip: 'Favorito',
-                      onPressed: () async {
-                        await ref
-                            .read(playlistRepositoryProvider)
-                            .toggleFavorite(item);
-                        await refreshAndPop();
-                      },
-                    ),
+                    _posterAndTitle(context, info),
+                    const SizedBox(height: 16),
+                    if (info != null) _chips(context, info),
+                    const SizedBox(height: 16),
+                    _actions(context, ref, resumeLabel, cat),
+                    const SizedBox(height: 20),
+                    if (infoAsync.isLoading) const _LoadingLine(),
+                    if (info != null && (info.plot ?? '').isNotEmpty) ...[
+                      const Text('Sinopsis',
+                          style: TextStyle(
+                              fontWeight: FontWeight.w700, fontSize: 16)),
+                      const SizedBox(height: 6),
+                      Text(info.plot!,
+                          style: const TextStyle(
+                              height: 1.5, color: Colors.white70)),
+                      const SizedBox(height: 16),
+                    ],
+                    if (info?.cast != null) _line('Reparto', info!.cast!),
+                    if (info?.director != null)
+                      _line('Dirección', info!.director!),
+                    if (info == null && !infoAsync.isLoading)
+                      const Text('Sin ficha disponible para este contenido',
+                          style: TextStyle(color: Colors.white38)),
                   ],
                 ),
-                const SizedBox(height: 16),
-                if (infoAsync.isLoading)
-                  const Padding(
-                    padding: EdgeInsets.symmetric(vertical: 8),
-                    child: Row(children: [
-                      SizedBox(
-                          width: 16,
-                          height: 16,
-                          child: CircularProgressIndicator(strokeWidth: 2)),
-                      SizedBox(width: 8),
-                      Text('Cargando ficha...'),
-                    ]),
-                  ),
-                if (info != null && (info.plot ?? '').isNotEmpty) ...[
-                  Text(info.plot!, style: const TextStyle(height: 1.4)),
-                  const SizedBox(height: 16),
-                ],
-                if (info?.cast != null)
-                  _line(context, 'Reparto', info!.cast!),
-                if (info?.director != null)
-                  _line(context, 'Dirección', info!.director!),
-                if (info == null && !infoAsync.isLoading)
-                  const Text('Sin ficha disponible para este contenido',
-                      style: TextStyle(color: Colors.grey)),
-              ],
+              ),
             ),
           ),
         ],
@@ -117,21 +81,96 @@ class MovieDetailScreen extends ConsumerWidget {
     );
   }
 
-  Widget _chip(BuildContext context, String text) => Chip(
-        label: Text(text),
-        materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-        visualDensity: VisualDensity.compact,
-      );
+  Widget _posterAndTitle(BuildContext context, VodInfo? info) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.end,
+      children: [
+        ClipRRect(
+          borderRadius: BorderRadius.circular(12),
+          child: Container(
+            width: 110,
+            height: 165,
+            color: kSurfaceHigh,
+            child: item.logoUrl == null
+                ? const Icon(Icons.movie_outlined, size: 40)
+                : CachedNetworkImage(
+                    imageUrl: item.logoUrl!, fit: BoxFit.cover),
+          ),
+        ),
+        const SizedBox(width: 14),
+        Expanded(
+          child: Padding(
+            padding: const EdgeInsets.only(bottom: 6),
+            child: Text(item.name,
+                style: const TextStyle(
+                    fontSize: 22, fontWeight: FontWeight.w800, height: 1.2)),
+          ),
+        ),
+      ],
+    );
+  }
 
-  Widget _line(BuildContext context, String label, String value) => Padding(
+  Widget _chips(BuildContext context, VodInfo info) {
+    final chips = <String>[
+      if (info.year != null) info.year!,
+      if (info.genre != null) info.genre!,
+      if (info.durationText != null) info.durationText!,
+      if (info.rating != null) '⭐ ${info.rating}',
+    ];
+    return Wrap(
+      spacing: 8,
+      runSpacing: 6,
+      children: [
+        for (final t in chips)
+          Chip(
+            label: Text(t, style: const TextStyle(fontSize: 12)),
+            visualDensity: VisualDensity.compact,
+            materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+          ),
+      ],
+    );
+  }
+
+  Widget _actions(
+      BuildContext context, WidgetRef ref, String resumeLabel, String cat) {
+    return Row(
+      children: [
+        Expanded(
+          child: FilledButton.icon(
+            onPressed: () async {
+              await openPlayer(context, item);
+              ref.invalidate(continueWatchingProvider);
+              ref.invalidate(moviesByCategoryProvider(cat));
+            },
+            icon: const Icon(Icons.play_arrow),
+            label: Text(resumeLabel),
+          ),
+        ),
+        const SizedBox(width: 10),
+        IconButton.filledTonal(
+          iconSize: 22,
+          onPressed: () async {
+            await ref.read(playlistRepositoryProvider).toggleFavorite(item);
+            ref.invalidate(favoritesProvider);
+            ref.invalidate(moviesByCategoryProvider(cat));
+          },
+          icon: Icon(
+              item.isFavorite ? Icons.favorite : Icons.favorite_border),
+        ),
+      ],
+    );
+  }
+
+  Widget _line(String label, String value) => Padding(
         padding: const EdgeInsets.only(bottom: 8),
         child: RichText(
           text: TextSpan(
-            style: DefaultTextStyle.of(context).style,
+            style: const TextStyle(color: Colors.white70, height: 1.4),
             children: [
               TextSpan(
                   text: '$label: ',
-                  style: const TextStyle(fontWeight: FontWeight.bold)),
+                  style: const TextStyle(
+                      fontWeight: FontWeight.w700, color: Colors.white)),
               TextSpan(text: value),
             ],
           ),
@@ -139,32 +178,54 @@ class MovieDetailScreen extends ConsumerWidget {
       );
 }
 
-class _Header extends StatelessWidget {
+class _Backdrop extends StatelessWidget {
   final MediaItem item;
   final VodInfo? info;
-  const _Header({required this.item, required this.info});
+  const _Backdrop({required this.item, required this.info});
 
   @override
   Widget build(BuildContext context) {
-    final img = info?.backdrop ?? info?.cover ?? item.logoUrl;
-    if (img == null) {
-      return Container(
-        height: 180,
-        color: Colors.grey.shade900,
-        child: const Center(child: Icon(Icons.movie, size: 60)),
-      );
-    }
-    return SizedBox(
-      height: 200,
-      width: double.infinity,
-      child: CachedNetworkImage(
-        imageUrl: img,
-        fit: BoxFit.cover,
-        errorWidget: (_, _, _) => Container(
-          color: Colors.grey.shade900,
-          child: const Center(child: Icon(Icons.movie, size: 60)),
+    final wide = info?.backdrop;
+    final poster = info?.cover ?? item.logoUrl;
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        if (wide != null)
+          CachedNetworkImage(imageUrl: wide, fit: BoxFit.cover)
+        else if (poster != null)
+          ImageFiltered(
+            imageFilter: ImageFilter.blur(sigmaX: 30, sigmaY: 30),
+            child: CachedNetworkImage(imageUrl: poster, fit: BoxFit.cover),
+          )
+        else
+          Container(color: kSurfaceHigh),
+        const DecoratedBox(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [Color(0x22000000), kBackground],
+              stops: [0.35, 1.0],
+            ),
+          ),
         ),
-      ),
+      ],
     );
   }
+}
+
+class _LoadingLine extends StatelessWidget {
+  const _LoadingLine();
+  @override
+  Widget build(BuildContext context) => const Padding(
+        padding: EdgeInsets.only(bottom: 12),
+        child: Row(children: [
+          SizedBox(
+              width: 16,
+              height: 16,
+              child: CircularProgressIndicator(strokeWidth: 2)),
+          SizedBox(width: 8),
+          Text('Cargando ficha...', style: TextStyle(color: Colors.white54)),
+        ]),
+      );
 }
