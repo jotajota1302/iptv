@@ -47,6 +47,30 @@ guarda localmente en `third_party/libmpv/` (ignorada por git).
 
 Ambos se guardan entre sesiones (`shared_preferences`).
 
+## Android (móvil)
+
+El proyecto ya está preparado para Android (permisos de red y tráfico http en
+claro en el `AndroidManifest`, y `media_kit_libs_video` que incluye las
+librerías nativas de Android). Para compilar necesitas el **SDK de Android**:
+
+1. Instala [Android Studio](https://developer.android.com/studio) y, en el
+   primer arranque, deja que instale el **Android SDK** y las **platform-tools**.
+2. Acepta las licencias: `flutter doctor --android-licenses`.
+3. Comprueba el entorno: `flutter doctor` (la línea *Android toolchain* debe salir en verde).
+4. Compila / ejecuta:
+
+   ```bash
+   flutter build apk --release        # genera el APK
+   # o, con un móvil/emulador conectado:
+   flutter run -d <device>
+   ```
+
+Notas:
+- El parche de `libmpv` es **solo para Windows**; en Android las librerías
+  nativas las aporta `media_kit_libs_video`.
+- Muchos streams IPTV usan `http` (no `https`); por eso el manifest habilita
+  `usesCleartextTraffic`.
+
 ## Documentación de diseño
 
 - Diseño: `docs/superpowers/specs/2026-07-01-iptv-player-design.md`
