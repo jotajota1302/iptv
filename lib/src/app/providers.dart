@@ -6,8 +6,10 @@ import '../data/app_database.dart';
 import '../data/epg_service.dart';
 import '../data/m3u_source.dart';
 import '../data/playlist_repository.dart';
+import '../data/series_grouper.dart';
 import '../domain/category.dart';
 import '../domain/media_item.dart';
+import '../domain/series_group.dart';
 
 final databaseProvider = Provider<AppDatabase>((ref) {
   final db = AppDatabase();
@@ -78,6 +80,29 @@ void setDeinterlaceSetting(WidgetRef ref, bool value) {
 final liveByCategoryProvider =
     FutureProvider.family<List<MediaItem>, String>((ref, group) {
   return ref.watch(playlistRepositoryProvider).liveByCategory(group);
+});
+
+// --- VOD: películas y series ---
+
+final movieCategoriesProvider = FutureProvider<List<Category>>((ref) {
+  return ref.watch(playlistRepositoryProvider).movieCategories();
+});
+
+final moviesByCategoryProvider =
+    FutureProvider.family<List<MediaItem>, String>((ref, group) {
+  return ref.watch(playlistRepositoryProvider).moviesByCategory(group);
+});
+
+final seriesCategoriesProvider = FutureProvider<List<Category>>((ref) {
+  return ref.watch(playlistRepositoryProvider).seriesCategories();
+});
+
+/// Series de una categoría ya agrupadas (Serie → Temporadas → Episodios).
+final seriesGroupsByCategoryProvider =
+    FutureProvider.family<List<SeriesGroup>, String>((ref, group) async {
+  final items =
+      await ref.watch(playlistRepositoryProvider).seriesByCategory(group);
+  return groupSeries(items);
 });
 
 /// Servicio de guía de programación (EPG) via API Xtream.

@@ -79,4 +79,33 @@ class PlaylistRepository {
         .where((i) => (i.groupTitle ?? 'Sin categoria') == group)
         .toList();
   }
+
+  // --- VOD (películas y series) ---
+
+  Future<List<Category>> movieCategories() =>
+      _db.categoriesByType(ContentType.movie);
+
+  Future<List<MediaItem>> moviesByCategory(String group) async {
+    final all = await _db.itemsByType(ContentType.movie);
+    return all
+        .where((i) => (i.groupTitle ?? 'Sin categoria') == group)
+        .toList();
+  }
+
+  Future<List<Category>> seriesCategories() =>
+      _db.categoriesByType(ContentType.series);
+
+  Future<List<MediaItem>> seriesByCategory(String group) async {
+    final all = await _db.itemsByType(ContentType.series);
+    return all
+        .where((i) => (i.groupTitle ?? 'Sin categoria') == group)
+        .toList();
+  }
+
+  /// Guarda la posición de reproducción (segundos) para reanudar.
+  Future<void> saveProgress(String id, int seconds) =>
+      _db.setPosition(id, seconds);
+
+  /// Posición de reproducción guardada (segundos) de un item.
+  Future<int> progress(String id) => _db.getPosition(id);
 }
