@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'live_tab.dart';
+import 'movies_tab.dart';
+import 'series_tab.dart';
 import 'favorites_tab.dart';
 import 'search_tab.dart';
 import 'settings_tab.dart';
@@ -12,9 +14,18 @@ class AppShell extends StatefulWidget {
 
 class _AppShellState extends State<AppShell> {
   int _index = 0;
-  static const _tabs = [LiveTab(), FavoritesTab(), SearchTab(), SettingsTab()];
+  static const _tabs = [
+    LiveTab(),
+    MoviesTab(),
+    SeriesTab(),
+    FavoritesTab(),
+    SearchTab(),
+    SettingsTab(),
+  ];
   static const _destinations = [
     (icon: Icons.live_tv, label: 'TV'),
+    (icon: Icons.movie, label: 'Películas'),
+    (icon: Icons.theaters, label: 'Series'),
     (icon: Icons.favorite, label: 'Favoritos'),
     (icon: Icons.search, label: 'Buscar'),
     (icon: Icons.settings, label: 'Ajustes'),
