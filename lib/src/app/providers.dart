@@ -8,6 +8,7 @@ import '../data/m3u_source.dart';
 import '../data/playlist_repository.dart';
 import '../data/series_grouper.dart';
 import '../data/vod_info_service.dart';
+import '../domain/adult_filter.dart';
 import '../domain/category.dart';
 import '../domain/content_type.dart';
 import '../domain/media_item.dart';
@@ -24,8 +25,33 @@ final playlistRepositoryProvider = Provider<PlaylistRepository>((ref) {
   return PlaylistRepository(M3uSource(DioHttpClient()), db);
 });
 
-final liveCategoriesProvider = FutureProvider<List<Category>>((ref) {
-  return ref.watch(playlistRepositoryProvider).liveCategories();
+/// Oculta categorías/contenido para adultos (+18). Persistido, por defecto ON.
+final parentalHideProvider = StateProvider<bool>(
+    (ref) => ref.watch(sharedPrefsProvider).getBool('parental_hide') ?? true);
+
+/// PIN opcional para desactivar el control parental ('' = sin PIN).
+final parentalPinProvider = StateProvider<String>(
+    (ref) => ref.watch(sharedPrefsProvider).getString('parental_pin') ?? '');
+
+void setParentalHide(WidgetRef ref, bool value) {
+  ref.read(parentalHideProvider.notifier).state = value;
+  ref.read(sharedPrefsProvider).setBool('parental_hide', value);
+}
+
+void setParentalPin(WidgetRef ref, String value) {
+  ref.read(parentalPinProvider.notifier).state = value;
+  ref.read(sharedPrefsProvider).setString('parental_pin', value);
+}
+
+/// Filtra categorías para adultos si el control parental está activo.
+List<Category> _filterAdultCats(Ref ref, List<Category> cats) {
+  if (!ref.watch(parentalHideProvider)) return cats;
+  return cats.where((c) => !isAdult(c.name)).toList();
+}
+
+final liveCategoriesProvider = FutureProvider<List<Category>>((ref) async {
+  return _filterAdultCats(
+      ref, await ref.watch(playlistRepositoryProvider).liveCategories());
 });
 
 final favoritesProvider = FutureProvider<List<MediaItem>>((ref) {
@@ -37,10 +63,14 @@ final searchQueryProvider = StateProvider<String>((_) => '');
 /// Filtro de tipo en la búsqueda (null = todos).
 final searchFilterProvider = StateProvider<ContentType?>((_) => null);
 
-final searchResultsProvider = FutureProvider<List<MediaItem>>((ref) {
+final searchResultsProvider = FutureProvider<List<MediaItem>>((ref) async {
   final q = ref.watch(searchQueryProvider);
-  if (q.trim().isEmpty) return Future.value(<MediaItem>[]);
-  return ref.watch(playlistRepositoryProvider).search(q);
+  if (q.trim().isEmpty) return <MediaItem>[];
+  final results = await ref.watch(playlistRepositoryProvider).search(q);
+  if (!ref.watch(parentalHideProvider)) return results;
+  return results
+      .where((i) => !isAdult(i.name) && !isAdult(i.groupTitle))
+      .toList();
 });
 
 final loadStateProvider = StateProvider<String?>((_) => null);
@@ -89,8 +119,9 @@ final liveByCategoryProvider =
 
 // --- VOD: películas y series ---
 
-final movieCategoriesProvider = FutureProvider<List<Category>>((ref) {
-  return ref.watch(playlistRepositoryProvider).movieCategories();
+final movieCategoriesProvider = FutureProvider<List<Category>>((ref) async {
+  return _filterAdultCats(
+      ref, await ref.watch(playlistRepositoryProvider).movieCategories());
 });
 
 final moviesByCategoryProvider =
@@ -98,8 +129,9 @@ final moviesByCategoryProvider =
   return ref.watch(playlistRepositoryProvider).moviesByCategory(group);
 });
 
-final seriesCategoriesProvider = FutureProvider<List<Category>>((ref) {
-  return ref.watch(playlistRepositoryProvider).seriesCategories();
+final seriesCategoriesProvider = FutureProvider<List<Category>>((ref) async {
+  return _filterAdultCats(
+      ref, await ref.watch(playlistRepositoryProvider).seriesCategories());
 });
 
 /// Series de una categoría ya agrupadas (Serie → Temporadas → Episodios).

@@ -64,6 +64,74 @@ class _SettingsTabState extends ConsumerState<SettingsTab> {
     await _run(() => ref.read(playlistRepositoryProvider).loadFromUrl(pl.url));
   }
 
+  /// Cambia el control parental. Al desactivarlo, si hay PIN, lo pide.
+  Future<void> _toggleParental(bool value) async {
+    final pin = ref.read(parentalPinProvider);
+    if (!value && pin.isNotEmpty) {
+      final ok = await _askPin('Introduce el PIN para mostrar +18', pin);
+      if (!ok) return;
+    }
+    setParentalHide(ref, value);
+  }
+
+  /// Pide un PIN y devuelve true si coincide con [expected].
+  Future<bool> _askPin(String title, String expected) async {
+    final ctrl = TextEditingController();
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(title),
+        content: TextField(
+          controller: ctrl,
+          keyboardType: TextInputType.number,
+          obscureText: true,
+          decoration: const InputDecoration(labelText: 'PIN'),
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Cancelar')),
+          FilledButton(
+              onPressed: () => Navigator.pop(ctx, ctrl.text == expected),
+              child: const Text('Aceptar')),
+        ],
+      ),
+    );
+    return ok ?? false;
+  }
+
+  /// Define o cambia el PIN. Si ya había PIN, pide el actual primero.
+  Future<void> _changePin() async {
+    final current = ref.read(parentalPinProvider);
+    if (current.isNotEmpty) {
+      final ok = await _askPin('PIN actual', current);
+      if (!ok) return;
+    }
+    if (!mounted) return;
+    final ctrl = TextEditingController();
+    final nuevo = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Nuevo PIN (vacío = quitar)'),
+        content: TextField(
+          controller: ctrl,
+          keyboardType: TextInputType.number,
+          obscureText: true,
+          decoration: const InputDecoration(labelText: 'Nuevo PIN'),
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Cancelar')),
+          FilledButton(
+              onPressed: () => Navigator.pop(ctx, ctrl.text),
+              child: const Text('Guardar')),
+        ],
+      ),
+    );
+    if (nuevo != null) setParentalPin(ref, nuevo.trim());
+  }
+
   @override
   Widget build(BuildContext context) {
     final repo = ref.watch(playlistRepositoryProvider);
@@ -198,6 +266,29 @@ class _SettingsTabState extends ConsumerState<SettingsTab> {
               '(1080i/576i). Recomendado activado. Aplica al abrir el vídeo.'),
           value: deinterlace,
           onChanged: (v) => setDeinterlaceSetting(ref, v),
+        ),
+
+        const SizedBox(height: 24),
+        const Divider(),
+        const Text('Control parental', style: TextStyle(fontSize: 20)),
+        SwitchListTile(
+          contentPadding: EdgeInsets.zero,
+          title: const Text('Ocultar contenido para adultos (+18)'),
+          subtitle: const Text(
+              'Oculta categorías y resultados de adultos en TV, Películas, '
+              'Series y búsqueda.'),
+          value: ref.watch(parentalHideProvider),
+          onChanged: _toggleParental,
+        ),
+        ListTile(
+          contentPadding: EdgeInsets.zero,
+          leading: const Icon(Icons.password),
+          title: Text(ref.watch(parentalPinProvider).isEmpty
+              ? 'Establecer PIN'
+              : 'Cambiar / quitar PIN'),
+          subtitle: const Text(
+              'Opcional: exige PIN para volver a mostrar el contenido +18.'),
+          onTap: _changePin,
         ),
       ],
     );
