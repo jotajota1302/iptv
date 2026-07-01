@@ -20,13 +20,45 @@ class ManagementScreen extends ConsumerWidget {
             ? const Center(child: Text('Añade una lista primero'))
             : ListView.builder(
                 itemCount: cats.length,
-                itemBuilder: (_, i) => ListTile(
-                  title: Text(cats[i].name),
-                  trailing: Text('${cats[i].itemCount}'),
-                  onTap: () => Navigator.of(context).push(MaterialPageRoute(
-                    builder: (_) => ManageCategoryScreen(category: cats[i]),
-                  )),
-                ),
+                itemBuilder: (_, i) {
+                  final cat = cats[i];
+                  return ListTile(
+                    title: Text(cat.name),
+                    trailing: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text('${cat.itemCount}'),
+                        PopupMenuButton<String>(
+                          onSelected: (action) async {
+                            final repo = ref.read(playlistRepositoryProvider);
+                            if (action == 'ocultar') {
+                              await repo.hideCategory(cat.name);
+                            } else if (action == 'restaurar') {
+                              await repo.restoreCategory(cat.name);
+                            }
+                            ref.invalidate(manageCategoriesProvider);
+                            ref.invalidate(
+                                manageLiveByCategoryProvider(cat.name));
+                            ref.invalidate(liveByCategoryProvider(cat.name));
+                            ref.invalidate(liveCategoriesProvider);
+                            ref.invalidate(favoritesProvider);
+                          },
+                          itemBuilder: (_) => const [
+                            PopupMenuItem(
+                                value: 'ocultar',
+                                child: Text('Ocultar categoría')),
+                            PopupMenuItem(
+                                value: 'restaurar',
+                                child: Text('Restaurar categoría')),
+                          ],
+                        ),
+                      ],
+                    ),
+                    onTap: () => Navigator.of(context).push(MaterialPageRoute(
+                      builder: (_) => ManageCategoryScreen(category: cat),
+                    )),
+                  );
+                },
               ),
       ),
     );

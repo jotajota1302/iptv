@@ -56,6 +56,14 @@ class PlaylistRepository {
 
   Future<void> restoreItem(MediaItem item) => _db.restore(item.id);
 
+  /// Oculta la categoría en directo completa.
+  Future<void> hideCategory(String group) =>
+      _db.hideCategory(ContentType.live, group);
+
+  /// Restaura (muestra) la categoría en directo completa.
+  Future<void> restoreCategory(String group) =>
+      _db.restoreCategory(ContentType.live, group);
+
   /// Categorías en directo para la pantalla de gestión (incluye ocultos).
   Future<List<Category>> manageCategories() =>
       _db.categoriesByType(ContentType.live, onlyVisible: false);

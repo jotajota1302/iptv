@@ -147,6 +147,25 @@ class AppDatabase extends _$AppDatabase {
           const ItemsCompanion(
               isHidden: Value(false), isDeleted: Value(false)));
 
+  Expression<bool> _inCategory($ItemsTable t, ContentType type, String group) {
+    final base = t.type.equals(type.index);
+    // 'Sin categoria' representa groupTitle NULL.
+    return group == 'Sin categoria'
+        ? base & t.groupTitle.isNull()
+        : base & t.groupTitle.equals(group);
+  }
+
+  /// Oculta todos los canales de una categoría.
+  Future<void> hideCategory(ContentType type, String group) =>
+      (update(items)..where((t) => _inCategory(t, type, group)))
+          .write(const ItemsCompanion(isHidden: Value(true)));
+
+  /// Restaura (muestra) todos los canales de una categoría.
+  Future<void> restoreCategory(ContentType type, String group) =>
+      (update(items)..where((t) => _inCategory(t, type, group))).write(
+          const ItemsCompanion(
+              isHidden: Value(false), isDeleted: Value(false)));
+
   Future<List<MediaItem>> favorites() async {
     final rows = await (select(items)
           ..where((t) => t.isFavorite.equals(true) & _visible(t)))

@@ -18,13 +18,38 @@ class LiveTab extends ConsumerWidget {
         }
         return ListView.builder(
           itemCount: cats.length,
-          itemBuilder: (_, i) => ListTile(
-            title: Text(cats[i].name),
-            trailing: Text('${cats[i].itemCount}'),
-            onTap: () => Navigator.of(context).push(MaterialPageRoute(
-              builder: (_) => ChannelListScreen(category: cats[i]),
-            )),
-          ),
+          itemBuilder: (_, i) {
+            final cat = cats[i];
+            return ListTile(
+              title: Text(cat.name),
+              trailing: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text('${cat.itemCount}'),
+                  PopupMenuButton<String>(
+                    onSelected: (action) async {
+                      if (action == 'ocultar') {
+                        await ref
+                            .read(playlistRepositoryProvider)
+                            .hideCategory(cat.name);
+                        ref.invalidate(liveCategoriesProvider);
+                      }
+                    },
+                    itemBuilder: (_) => const [
+                      PopupMenuItem(
+                          value: 'ocultar',
+                          child: ListTile(
+                              leading: Icon(Icons.visibility_off),
+                              title: Text('Ocultar categoría'))),
+                    ],
+                  ),
+                ],
+              ),
+              onTap: () => Navigator.of(context).push(MaterialPageRoute(
+                builder: (_) => ChannelListScreen(category: cat),
+              )),
+            );
+          },
         );
       },
     );

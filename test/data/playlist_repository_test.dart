@@ -51,4 +51,24 @@ void main() {
     expect((await repo.liveByCategory('Nacionales')).length, 1);
     await db.close();
   });
+
+  test('hideCategory oculta toda la categoria y restoreCategory la recupera',
+      () async {
+    final db = AppDatabase.forTesting(NativeDatabase.memory());
+    final source = _MockSource();
+    when(() => source.fetchFromUrl(any())).thenAnswer((_) async => _m3u);
+    final repo = PlaylistRepository(source, db);
+    await repo.loadFromUrl('http://x');
+    // _m3u tiene 1 canal live en "Nacionales".
+    expect((await repo.liveByCategory('Nacionales')).length, 1);
+
+    await repo.hideCategory('Nacionales');
+    expect(await repo.liveByCategory('Nacionales'), isEmpty);
+    // La categoria desaparece de la navegacion.
+    expect(await repo.liveCategories(), isEmpty);
+
+    await repo.restoreCategory('Nacionales');
+    expect((await repo.liveByCategory('Nacionales')).length, 1);
+    await db.close();
+  });
 }
