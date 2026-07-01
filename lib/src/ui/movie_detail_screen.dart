@@ -7,6 +7,8 @@ import '../app/theme.dart';
 import '../data/vod_info_service.dart';
 import '../domain/media_item.dart';
 import 'play_helpers.dart';
+import 'vod_poster.dart';
+import 'widgets/content_rail.dart';
 
 /// Ficha de película estilo cine: backdrop a pantalla con degradado, póster
 /// superpuesto, metadatos y sinopsis. Datos de la API Xtream (best-effort).
@@ -76,6 +78,34 @@ class MovieDetailScreen extends ConsumerWidget {
               ),
             ),
           ),
+          SliverToBoxAdapter(child: _related(context, ref, cat)),
+        ],
+      ),
+    );
+  }
+
+  Widget _related(BuildContext context, WidgetRef ref, String cat) {
+    final others = (ref.watch(moviesByCategoryProvider(cat)).value ??
+            const <MediaItem>[])
+        .where((m) => m.id != item.id)
+        .take(15)
+        .toList();
+    if (others.isEmpty) return const SizedBox(height: 8);
+    return Transform.translate(
+      offset: const Offset(0, -40),
+      child: ContentRail(
+        title: 'Más en $cat',
+        items: [
+          for (final m in others)
+            VodPoster(
+              title: m.name,
+              posterUrl: m.logoUrl,
+              titleOverlay: true,
+              favorite: m.isFavorite,
+              onTap: () => Navigator.of(context).pushReplacement(
+                MaterialPageRoute(builder: (_) => MovieDetailScreen(item: m)),
+              ),
+            ),
         ],
       ),
     );
