@@ -4,10 +4,9 @@ import 'package:iptv_player/src/data/epg_service.dart';
 
 void main() {
   group('buildShortEpgUrl', () {
-    test('deriva credenciales de la lista y stream_id del stream', () {
+    test('deriva host, credenciales y stream_id de la URL del stream', () {
       final url = buildShortEpgUrl(
-        'https://host.tv:8443/get.php?username=u1&password=p1&type=m3u_plus',
-        'https://host.tv:8443/u1/p1/12345.ts',
+        'https://host.tv:8443/live/u1/p1/12345.ts',
       );
       expect(url, isNotNull);
       expect(url!.host, 'host.tv');
@@ -19,12 +18,14 @@ void main() {
       expect(url.queryParameters['stream_id'], '12345');
     });
 
-    test('null si faltan credenciales', () {
-      final url = buildShortEpgUrl(
-        'https://host.tv/get.php?type=m3u_plus',
-        'https://host.tv/u1/p1/12345.ts',
-      );
-      expect(url, isNull);
+    test('funciona sin prefijo /live (user/pass/id.ts)', () {
+      final url = buildShortEpgUrl('https://host.tv/u1/p1/999.ts');
+      expect(url!.queryParameters['stream_id'], '999');
+      expect(url.queryParameters['username'], 'u1');
+    });
+
+    test('null si la URL no encaja con el patron Xtream', () {
+      expect(buildShortEpgUrl('https://host.tv/solo.ts'), isNull);
     });
   });
 

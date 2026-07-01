@@ -109,12 +109,10 @@ final seriesGroupsByCategoryProvider =
 final epgServiceProvider = Provider<EpgService>((_) => EpgService());
 
 /// Programación corta (actual y siguientes) del canal cuyo streamUrl se pasa.
-/// Usa las credenciales de la lista activa. Best-effort: vacío si no disponible.
+/// Las credenciales se derivan de la propia URL del stream. Best-effort.
 final previewEpgProvider =
-    FutureProvider.family<List<EpgEntry>, String>((ref, streamUrl) async {
-  final active = ref.watch(playlistsProvider).active;
-  if (active == null) return const [];
-  return ref.watch(epgServiceProvider).shortEpg(active.url, streamUrl);
+    FutureProvider.family<List<EpgEntry>, String>((ref, streamUrl) {
+  return ref.watch(epgServiceProvider).shortEpg(streamUrl);
 });
 
 /// Categorías en directo para la pantalla de gestión (incluye ocultos).

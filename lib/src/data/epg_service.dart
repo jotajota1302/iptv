@@ -10,25 +10,26 @@ class EpgEntry {
   const EpgEntry({required this.title, required this.start, required this.end});
 }
 
-/// Construye la URL de la API Xtream `get_short_epg` a partir de la URL de la
-/// lista (get.php con username/password) y la URL del stream (para el
-/// stream_id, que es el último segmento del path sin extensión).
+/// Construye la URL de la API Xtream `get_short_epg` derivando TODO de la URL
+/// del stream, que en Xtream tiene la forma
+/// `scheme://host:port/[live|movie|series]/user/pass/streamId.ext`.
+/// Así no dependemos de que haya una lista guardada activa.
 ///
-/// Devuelve null si faltan credenciales o no se puede deducir el stream_id.
-Uri? buildShortEpgUrl(String playlistUrl, String streamUrl, {int limit = 4}) {
-  final p = Uri.tryParse(playlistUrl);
+/// Devuelve null si la URL no encaja con ese patrón.
+Uri? buildShortEpgUrl(String streamUrl, {int limit = 4}) {
   final s = Uri.tryParse(streamUrl);
-  if (p == null || s == null) return null;
-  final user = p.queryParameters['username'];
-  final pass = p.queryParameters['password'];
-  if (user == null || pass == null) return null;
-  if (s.pathSegments.isEmpty) return null;
-  final streamId = s.pathSegments.last.split('.').first;
-  if (streamId.isEmpty) return null;
+  if (s == null) return null;
+  final segs = s.pathSegments;
+  // Necesitamos al menos user/pass/id (los 3 últimos segmentos).
+  if (segs.length < 3) return null;
+  final streamId = segs.last.split('.').first;
+  final pass = segs[segs.length - 2];
+  final user = segs[segs.length - 3];
+  if (streamId.isEmpty || user.isEmpty || pass.isEmpty) return null;
   return Uri(
-    scheme: p.scheme,
-    host: p.host,
-    port: p.hasPort ? p.port : null,
+    scheme: s.scheme,
+    host: s.host,
+    port: s.hasPort ? s.port : null,
     path: '/player_api.php',
     queryParameters: {
       'username': user,
@@ -80,10 +81,15 @@ DateTime? _tsToDate(dynamic v) {
 /// Es "best-effort": ante cualquier error devuelve lista vacía.
 class EpgService {
   final Dio _dio;
-  EpgService([Dio? dio]) : _dio = dio ?? Dio();
+  EpgService([Dio? dio])
+      : _dio = dio ??
+            Dio(BaseOptions(
+              connectTimeout: const Duration(seconds: 12),
+              receiveTimeout: const Duration(seconds: 12),
+            ));
 
-  Future<List<EpgEntry>> shortEpg(String playlistUrl, String streamUrl) async {
-    final url = buildShortEpgUrl(playlistUrl, streamUrl);
+  Future<List<EpgEntry>> shortEpg(String streamUrl) async {
+    final url = buildShortEpgUrl(streamUrl);
     if (url == null) return [];
     try {
       final resp = await _dio.getUri<dynamic>(url);

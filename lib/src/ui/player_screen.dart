@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:media_kit/media_kit.dart';
 import 'package:media_kit_video/media_kit_video.dart';
 import '../app/providers.dart';
 import '../domain/media_item.dart';
@@ -26,6 +27,10 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
   int _positionSeconds = 0;
   Duration _duration = Duration.zero;
 
+  // Pistas disponibles (audio/subtítulos) para poder elegirlas.
+  List<AudioTrack> _audioTracks = [];
+  List<SubtitleTrack> _subtitleTracks = [];
+
   @override
   void initState() {
     super.initState();
@@ -36,6 +41,13 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
       configuration:
           VideoControllerConfiguration(enableHardwareAcceleration: hwAccel),
     );
+    _subs.add(_ctrl.player.stream.tracks.listen((t) {
+      if (!mounted) return;
+      setState(() {
+        _audioTracks = t.audio;
+        _subtitleTracks = t.subtitle;
+      });
+    }));
     if (widget.resume) _setupResume();
     _ctrl.open(widget.item.streamUrl);
     // Requiere la libmpv completa (con bwdif). Ver tool/patch_libmpv.sh.
@@ -81,6 +93,20 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
         .saveProgress(widget.item.id, _positionSeconds);
   }
 
+  String _audioLabel(AudioTrack t) {
+    if (t.id == 'auto') return 'Automático';
+    if (t.id == 'no') return 'Ninguno';
+    final parts = [t.title, t.language].where((e) => e != null && e.isNotEmpty);
+    return parts.isEmpty ? 'Pista ${t.id}' : parts.join(' · ');
+  }
+
+  String _subLabel(SubtitleTrack t) {
+    if (t.id == 'no') return 'Desactivados';
+    if (t.id == 'auto') return 'Automático';
+    final parts = [t.title, t.language].where((e) => e != null && e.isNotEmpty);
+    return parts.isEmpty ? 'Sub ${t.id}' : parts.join(' · ');
+  }
+
   @override
   void dispose() {
     _save();
@@ -91,10 +117,44 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     super.dispose();
   }
 
+  List<Widget> _trackActions() {
+    final actions = <Widget>[];
+    // Selección de audio (solo si hay más de una pista real).
+    final audios = _audioTracks.where((t) => t.id != 'auto').toList();
+    if (audios.length > 1) {
+      actions.add(PopupMenuButton<AudioTrack>(
+        icon: const Icon(Icons.multitrack_audio),
+        tooltip: 'Audio',
+        onSelected: (t) => _ctrl.player.setAudioTrack(t),
+        itemBuilder: (_) => [
+          for (final t in _audioTracks.where((t) => t.id != 'no'))
+            PopupMenuItem(value: t, child: Text(_audioLabel(t))),
+        ],
+      ));
+    }
+    // Selección de subtítulos (siempre que exista alguno).
+    final subs = _subtitleTracks.where((t) => t.id != 'auto').toList();
+    final hasRealSubs = subs.any((t) => t.id != 'no');
+    if (hasRealSubs) {
+      actions.add(PopupMenuButton<SubtitleTrack>(
+        icon: const Icon(Icons.subtitles),
+        tooltip: 'Subtítulos',
+        onSelected: (t) => _ctrl.player.setSubtitleTrack(t),
+        itemBuilder: (_) => [
+          PopupMenuItem(
+              value: SubtitleTrack.no(), child: Text(_subLabel(SubtitleTrack.no()))),
+          for (final t in subs.where((t) => t.id != 'no'))
+            PopupMenuItem(value: t, child: Text(_subLabel(t))),
+        ],
+      ));
+    }
+    return actions;
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text(widget.item.name)),
+      appBar: AppBar(title: Text(widget.item.name), actions: _trackActions()),
       backgroundColor: Colors.black,
       body: Center(
         child: Video(controller: _video, fit: BoxFit.contain),
