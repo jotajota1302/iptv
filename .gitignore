@@ -1,0 +1,7 @@
+# IPTV Player
+
+.dart_tool/
+build/
+.idea/
+*.iml
+.gitignore~
