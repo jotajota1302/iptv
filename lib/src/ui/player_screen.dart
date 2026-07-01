@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:media_kit_video/media_kit_video.dart';
 import '../app/providers.dart';
+import '../domain/content_type.dart';
 import '../domain/media_item.dart';
 import '../player/media_kit_player_controller.dart';
 
@@ -35,7 +36,11 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
   void initState() {
     super.initState();
     final hwAccel = ref.read(hardwareAccelProvider);
-    final deinterlace = ref.read(deinterlaceProvider);
+    final isVod = widget.item.type == ContentType.movie ||
+        widget.item.type == ContentType.series;
+    // VOD es progresivo (no entrelazado): sin bwdif y con búfer amplio para 4K.
+    // TV en directo respeta el ajuste de desentrelazado.
+    final deinterlace = isVod ? false : ref.read(deinterlaceProvider);
     _video = VideoController(
       _ctrl.player,
       configuration:
@@ -50,8 +55,12 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     }));
     if (widget.resume) _setupResume();
     _ctrl.open(widget.item.streamUrl);
-    // Requiere la libmpv completa (con bwdif). Ver tool/patch_libmpv.sh.
-    _ctrl.setDeinterlace(deinterlace);
+    // Config por tipo. bwdif requiere la libmpv completa (ver tool/patch_libmpv.sh).
+    _ctrl.configure(
+      hardwareDecode: hwAccel,
+      deinterlace: deinterlace,
+      largeBuffer: isVod,
+    );
   }
 
   /// Configura la lógica de reanudar: al conocer la duración salta a la

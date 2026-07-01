@@ -49,18 +49,14 @@ class _ChannelListScreenState extends ConsumerState<ChannelListScreen> {
     await _previewCtrl!.setDeinterlace(ref.read(deinterlaceProvider));
   }
 
-  /// Abre el canal en pantalla completa. Pausa el preview antes para evitar
-  /// audio doble (dos reproductores sonando a la vez) y lo reanuda al volver
-  /// si sigue siendo el canal seleccionado.
+  /// Abre el canal en pantalla completa. Pausa el preview antes (evita audio
+  /// doble) y lo deja parado al volver: nada sigue sonando al salir.
   Future<void> _fullscreen(MediaItem it) async {
     await _previewCtrl?.pause();
     if (!mounted) return;
     await Navigator.of(context).push(
       MaterialPageRoute(builder: (_) => PlayerScreen(item: it)),
     );
-    if (mounted && _selected?.id == it.id) {
-      await _previewCtrl?.play();
-    }
   }
 
   Future<void> _action(String action, MediaItem it) async {

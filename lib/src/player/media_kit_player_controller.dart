@@ -22,20 +22,33 @@ class MediaKitPlayerController implements PlayerController {
   @override
   Future<void> open(String url) => player.open(Media(url));
 
-  /// Activa/desactiva el desentrelazado de mpv. Corrige el efecto "peine"
-  /// (líneas paralelas) en contenido entrelazado como la TV en directo.
-  ///
-  /// Usa el filtro de vídeo `bwdif` (software), que requiere decodificación por
-  /// software: con hwdec activo los fotogramas están en la GPU y el filtro no se
-  /// aplica. Por eso [PlayerScreen] fuerza decodificación por software cuando el
-  /// desentrelazado está activado.
+  /// Activa/desactiva el desentrelazado de mpv (filtro `bwdif`). Corrige el
+  /// efecto "peine" en contenido entrelazado (TV 1080i/576i). Con hwdec de tipo
+  /// *copy* (d3d11va-copy) los fotogramas vuelven a CPU y el filtro se aplica.
   Future<void> setDeinterlace(bool enabled) async {
     final platform = player.platform;
     if (platform is NativePlayer) {
-      // Requiere decodificación por software (hwdec='no'), configurada en
-      // PlayerScreen. bwdif es un desentrelazador de alta calidad.
       await platform.setProperty('vf', enabled ? 'bwdif' : '');
     }
+  }
+
+  /// Ajusta la decodificación según el contenido:
+  /// - [hardwareDecode]: `hwdec=auto-safe` (GPU) o `no` (software).
+  /// - [deinterlace]: aplica `bwdif` (para TV entrelazada) o ninguno (VOD).
+  /// - [largeBuffer]: amplía el búfer del demuxer, útil para 4K de alto bitrate.
+  Future<void> configure({
+    required bool hardwareDecode,
+    required bool deinterlace,
+    bool largeBuffer = false,
+  }) async {
+    final p = player.platform;
+    if (p is! NativePlayer) return;
+    await p.setProperty('hwdec', hardwareDecode ? 'auto-safe' : 'no');
+    await p.setProperty('vf', deinterlace ? 'bwdif' : '');
+    await p.setProperty(
+        'demuxer-max-bytes', largeBuffer ? '64MiB' : '16MiB');
+    await p.setProperty(
+        'demuxer-max-back-bytes', largeBuffer ? '32MiB' : '8MiB');
   }
 
   @override
@@ -50,6 +63,11 @@ class MediaKitPlayerController implements PlayerController {
       await s.cancel();
     }
     await _status.close();
+    // Detiene la reproducción y descarga el medio ANTES de liberar: en Windows
+    // player.dispose() por sí solo puede dejar el audio sonando un instante.
+    try {
+      await player.stop();
+    } catch (_) {}
     await player.dispose();
   }
 }
