@@ -27,7 +27,7 @@ class ChannelListScreen extends ConsumerWidget {
                   : CachedNetworkImage(
                       imageUrl: it.logoUrl!,
                       width: 48,
-                      errorWidget: (_, __, ___) => const Icon(Icons.live_tv),
+                      errorWidget: (_, _, _) => const Icon(Icons.live_tv),
                     ),
               title: Text(it.name),
               trailing: IconButton(
