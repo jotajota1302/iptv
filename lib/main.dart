@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'src/app/providers.dart';
+import 'src/app/theme.dart';
 import 'src/ui/app_shell.dart';
 
 Future<void> main() async {
@@ -22,7 +23,7 @@ class IptvApp extends StatelessWidget {
     return MaterialApp(
       title: 'IPTV Player',
       debugShowCheckedModeBanner: false,
-      theme: ThemeData.dark(useMaterial3: true),
+      theme: buildAppTheme(),
       home: const AppShell(),
     );
   }

@@ -112,6 +112,14 @@ class PlaylistRepository {
   /// Películas/series empezadas y sin terminar (más recientes primero).
   Future<List<MediaItem>> continueWatching() => _db.itemsInProgress();
 
+  /// Novedades de películas (recién añadidas).
+  Future<List<MediaItem>> recentMovies({int limit = 30}) =>
+      _db.recentByType(ContentType.movie, limit: limit);
+
+  /// Novedades de series: episodios recientes (para agrupar en el Inicio).
+  Future<List<MediaItem>> recentSeriesItems({int limit = 120}) =>
+      _db.recentByType(ContentType.series, limit: limit);
+
   // --- Gestión VOD (ocultar/borrar por tipo, igual que en TV) ---
 
   Future<void> hideCategoryOf(ContentType type, String group) =>

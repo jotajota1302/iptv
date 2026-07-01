@@ -59,6 +59,9 @@ final favoritesProvider = FutureProvider<List<MediaItem>>((ref) {
   return ref.watch(playlistRepositoryProvider).favorites();
 });
 
+/// Índice de la pestaña activa del AppShell (para navegar desde el Inicio).
+final selectedTabProvider = StateProvider<int>((_) => 0);
+
 final searchQueryProvider = StateProvider<String>((_) => '');
 
 /// Filtro de tipo en la búsqueda (null = todos).
@@ -192,6 +195,26 @@ final hiddenCountsByTypeProvider =
 /// Películas/series empezadas y sin terminar ("Continuar viendo").
 final continueWatchingProvider = FutureProvider<List<MediaItem>>((ref) {
   return ref.watch(playlistRepositoryProvider).continueWatching();
+});
+
+/// Novedades de películas (para el Inicio). Respeta el control parental.
+final recentMoviesProvider = FutureProvider<List<MediaItem>>((ref) async {
+  final list = await ref.watch(playlistRepositoryProvider).recentMovies();
+  if (!ref.watch(parentalHideProvider)) return list;
+  return list
+      .where((i) => !isAdult(i.name) && !isAdult(i.groupTitle))
+      .toList();
+});
+
+/// Novedades de series agrupadas (para el Inicio). Respeta el control parental.
+final recentSeriesProvider = FutureProvider<List<SeriesGroup>>((ref) async {
+  var list = await ref.watch(playlistRepositoryProvider).recentSeriesItems();
+  if (ref.watch(parentalHideProvider)) {
+    list = list
+        .where((i) => !isAdult(i.name) && !isAdult(i.groupTitle))
+        .toList();
+  }
+  return groupSeries(list);
 });
 
 /// Modo de ordenación del contenido dentro de una categoría. Persistido.

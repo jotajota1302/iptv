@@ -10,13 +10,20 @@ void main() {
     SharedPreferences.setMockInitialValues({});
     final prefs = await SharedPreferences.getInstance();
     await tester.pumpWidget(ProviderScope(
-      overrides: [sharedPrefsProvider.overrideWithValue(prefs)],
+      overrides: [
+        sharedPrefsProvider.overrideWithValue(prefs),
+        // Providers del Inicio vacíos para no tocar la base de datos.
+        recentMoviesProvider.overrideWith((ref) async => []),
+        recentSeriesProvider.overrideWith((ref) async => []),
+        continueWatchingProvider.overrideWith((ref) async => []),
+        favoritesProvider.overrideWith((ref) async => []),
+      ],
       child: const MaterialApp(home: AppShell()),
     ));
+    expect(find.text('Inicio'), findsWidgets);
     expect(find.text('TV'), findsWidgets);
     expect(find.text('Películas'), findsWidgets);
     expect(find.text('Series'), findsWidgets);
-    expect(find.text('Favoritos'), findsWidgets);
     expect(find.text('Buscar'), findsWidgets);
     expect(find.text('Ajustes'), findsWidgets);
   });

@@ -228,6 +228,20 @@ class AppDatabase extends _$AppDatabase {
     return row?.positionSeconds ?? 0;
   }
 
+  /// Items visibles de un tipo ordenados por "recién añadido" (para novedades).
+  Future<List<MediaItem>> recentByType(ContentType type,
+      {int limit = 30}) async {
+    final rows = await (select(items)
+          ..where((t) => t.type.equals(type.index) & _visible(t))
+          ..orderBy([
+            (t) => OrderingTerm.desc(t.addedAt),
+            (t) => OrderingTerm(expression: t.name),
+          ])
+          ..limit(limit))
+        .get();
+    return rows.map(_map).toList();
+  }
+
   /// Items VOD (película/serie) empezados y no terminados, más recientes
   /// primero. "No terminado" = queda >30 s para el final (o duración aún
   /// desconocida). Excluye ocultos/borrados.
