@@ -58,11 +58,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     if (widget.resume) _setupResume();
     _ctrl.open(widget.item.streamUrl);
     // Config por tipo. bwdif requiere la libmpv completa (ver tool/patch_libmpv.sh).
-    _ctrl.configure(
-      hardwareDecode: hwAccel,
-      deinterlace: deinterlace,
-      largeBuffer: isVod,
-    );
+    _ctrl.configure(deinterlace: deinterlace, largeBuffer: isVod);
   }
 
   /// Configura la lógica de reanudar: lee la posición guardada de la BD (fuente
@@ -90,8 +86,9 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     _subs.add(player.stream.position.listen((pos) {
       _positionSeconds = pos.inSeconds;
       _maybeSeek();
-      // Guarda cada 10s de avance, evitando escrituras excesivas.
-      if ((_positionSeconds - _lastSaved).abs() >= 10) {
+      // Guarda cada 10s de avance, pero solo tras resolver el salto de reanudar
+      // (evita sobrescribir la posición guardada con la del arranque en 0).
+      if (_seeked && (_positionSeconds - _lastSaved).abs() >= 10) {
         _lastSaved = _positionSeconds;
         _save();
       }

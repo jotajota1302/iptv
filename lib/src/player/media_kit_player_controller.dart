@@ -32,18 +32,17 @@ class MediaKitPlayerController implements PlayerController {
     }
   }
 
-  /// Ajusta la decodificación según el contenido:
-  /// - [hardwareDecode]: `hwdec=auto-safe` (GPU) o `no` (software).
-  /// - [deinterlace]: aplica `bwdif` (para TV entrelazada) o ninguno (VOD).
+  /// Ajusta filtros y búfer según el contenido. NO toca `hwdec` (lo fija
+  /// `enableHardwareAcceleration` al crear el controlador): cambiarlo tras abrir
+  /// reinicializa el decodificador en Windows y descartaría el seek de reanudar.
+  /// - [deinterlace]: aplica `bwdif` (TV entrelazada) o ninguno (VOD progresivo).
   /// - [largeBuffer]: amplía el búfer del demuxer, útil para 4K de alto bitrate.
   Future<void> configure({
-    required bool hardwareDecode,
     required bool deinterlace,
     bool largeBuffer = false,
   }) async {
     final p = player.platform;
     if (p is! NativePlayer) return;
-    await p.setProperty('hwdec', hardwareDecode ? 'auto-safe' : 'no');
     await p.setProperty('vf', deinterlace ? 'bwdif' : '');
     await p.setProperty(
         'demuxer-max-bytes', largeBuffer ? '64MiB' : '16MiB');
