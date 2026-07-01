@@ -32,7 +32,8 @@ class MediaKitPlayerController implements PlayerController {
   Future<void> setDeinterlace(bool enabled) async {
     final platform = player.platform;
     if (platform is NativePlayer) {
-      await platform.setProperty('deinterlace', enabled ? 'yes' : 'no');
+      // Requiere decodificación por software (hwdec='no'), configurada en
+      // PlayerScreen. bwdif es un desentrelazador de alta calidad.
       await platform.setProperty('vf', enabled ? 'bwdif' : '');
     }
   }

@@ -21,15 +21,13 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     super.initState();
     final hwAccel = ref.read(hardwareAccelProvider);
     final deinterlace = ref.read(deinterlaceProvider);
-    // El desentrelazado usa un filtro por software (bwdif) que no puede procesar
-    // fotogramas en la GPU, así que fuerza decodificación por software.
-    final useHw = hwAccel && !deinterlace;
     _video = VideoController(
       _ctrl.player,
       configuration:
-          VideoControllerConfiguration(enableHardwareAcceleration: useHw),
+          VideoControllerConfiguration(enableHardwareAcceleration: hwAccel),
     );
     _ctrl.open(widget.item.streamUrl);
+    // Requiere la libmpv completa (con bwdif). Ver tool/patch_libmpv.sh.
     _ctrl.setDeinterlace(deinterlace);
   }
 

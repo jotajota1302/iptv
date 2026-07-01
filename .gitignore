@@ -5,3 +5,9 @@ build/
 .idea/
 *.iml
 .gitignore~
+
+# Diagnostico local con credenciales - NO subir
+lib/diag.dart
+
+# libmpv completa (117MB, supera limite GitHub) - se obtiene con tool/patch_libmpv.sh
+third_party/
