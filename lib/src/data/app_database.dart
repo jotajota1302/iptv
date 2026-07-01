@@ -26,7 +26,7 @@ class Items extends Table {
 @DriftDatabase(tables: [Items])
 class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(_open());
-  AppDatabase.forTesting(QueryExecutor e) : super(e);
+  AppDatabase.forTesting(super.e);
 
   @override
   int get schemaVersion => 1;
