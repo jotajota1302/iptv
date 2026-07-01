@@ -2,6 +2,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../app/providers.dart';
+import 'management_screen.dart';
 
 class SettingsTab extends ConsumerStatefulWidget {
   const SettingsTab({super.key});
@@ -73,6 +74,14 @@ class _SettingsTabState extends ConsumerState<SettingsTab> {
             child: const Text('Elegir archivo'),
           ),
         ]),
+        const SizedBox(height: 16),
+        OutlinedButton.icon(
+          onPressed: () => Navigator.of(context).push(MaterialPageRoute(
+            builder: (_) => const ManagementScreen(),
+          )),
+          icon: const Icon(Icons.tune),
+          label: const Text('Gestionar canales (ocultar / borrar)'),
+        ),
         const SizedBox(height: 16),
         if (_loading) const LinearProgressIndicator(),
         if (status != null)
