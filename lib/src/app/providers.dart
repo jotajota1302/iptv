@@ -97,7 +97,7 @@ final hiddenCountsProvider = FutureProvider<Map<String, int>>((ref) {
 
 /// Vista en cuadrícula (iconos) vs lista en la pantalla de canales. Persistido.
 final channelGridProvider = StateProvider<bool>(
-    (ref) => ref.watch(sharedPrefsProvider).getBool('channel_grid') ?? false);
+    (ref) => ref.watch(sharedPrefsProvider).getBool('channel_grid') ?? true);
 
 void setChannelGrid(WidgetRef ref, bool value) {
   ref.read(channelGridProvider.notifier).state = value;
@@ -106,7 +106,7 @@ void setChannelGrid(WidgetRef ref, bool value) {
 
 /// Vista en cuadrícula vs lista en la pantalla de categorías de TV. Persistido.
 final categoryGridProvider = StateProvider<bool>(
-    (ref) => ref.watch(sharedPrefsProvider).getBool('category_grid') ?? false);
+    (ref) => ref.watch(sharedPrefsProvider).getBool('category_grid') ?? true);
 
 void setCategoryGrid(WidgetRef ref, bool value) {
   ref.read(categoryGridProvider.notifier).state = value;

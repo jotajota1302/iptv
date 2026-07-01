@@ -1,22 +1,61 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:media_kit_video/media_kit_video.dart';
 import '../app/providers.dart';
 import '../domain/category.dart';
 import '../domain/media_item.dart';
+import '../player/media_kit_player_controller.dart';
 import 'player_screen.dart';
 
-class ChannelListScreen extends ConsumerWidget {
+/// Ancho mínimo para mostrar el panel de preview lateral.
+const _kPreviewBreakpoint = 820.0;
+
+class ChannelListScreen extends ConsumerStatefulWidget {
   final Category category;
   const ChannelListScreen({super.key, required this.category});
 
-  void _play(BuildContext context, MediaItem it) {
+  @override
+  ConsumerState<ChannelListScreen> createState() => _ChannelListScreenState();
+}
+
+class _ChannelListScreenState extends ConsumerState<ChannelListScreen> {
+  MediaKitPlayerController? _previewCtrl;
+  VideoController? _previewVideo;
+  MediaItem? _selected;
+
+  @override
+  void dispose() {
+    _previewCtrl?.dispose();
+    super.dispose();
+  }
+
+  void _ensurePreview() {
+    if (_previewCtrl != null) return;
+    final ctrl = MediaKitPlayerController();
+    _previewCtrl = ctrl;
+    _previewVideo = VideoController(
+      ctrl.player,
+      configuration: VideoControllerConfiguration(
+          enableHardwareAcceleration: ref.read(hardwareAccelProvider)),
+    );
+  }
+
+  /// Reproduce el canal en el panel de preview (pantallas anchas).
+  Future<void> _preview(MediaItem it) async {
+    _ensurePreview();
+    setState(() => _selected = it);
+    await _previewCtrl!.open(it.streamUrl);
+    await _previewCtrl!.setDeinterlace(ref.read(deinterlaceProvider));
+  }
+
+  void _fullscreen(MediaItem it) {
     Navigator.of(context).push(
       MaterialPageRoute(builder: (_) => PlayerScreen(item: it)),
     );
   }
 
-  Future<void> _action(WidgetRef ref, String action, MediaItem it) async {
+  Future<void> _action(String action, MediaItem it) async {
     final repo = ref.read(playlistRepositoryProvider);
     if (action == 'favorito') {
       await repo.toggleFavorite(it);
@@ -25,14 +64,13 @@ class ChannelListScreen extends ConsumerWidget {
     } else if (action == 'borrar') {
       await repo.deleteItem(it);
     }
-    ref.invalidate(liveByCategoryProvider(category.name));
+    ref.invalidate(liveByCategoryProvider(widget.category.name));
     ref.invalidate(liveCategoriesProvider);
     ref.invalidate(favoritesProvider);
   }
 
-  PopupMenuButton<String> _menu(WidgetRef ref, MediaItem it) =>
-      PopupMenuButton<String>(
-        onSelected: (a) => _action(ref, a, it),
+  PopupMenuButton<String> _menu(MediaItem it) => PopupMenuButton<String>(
+        onSelected: (a) => _action(a, it),
         itemBuilder: (_) => [
           PopupMenuItem(
               value: 'favorito',
@@ -44,11 +82,9 @@ class ChannelListScreen extends ConsumerWidget {
         ],
       );
 
-  /// Logo sobre una placa clara uniforme: los logos de canales suelen estar
-  /// diseñados para fondo claro, así se ven bien y consistentes sobre el tema
-  /// oscuro (evita fondos feos/descuadrados).
   Widget _logo(MediaItem it, {double size = 48}) {
-    final fallback = Icon(Icons.live_tv, size: size * 0.55, color: Colors.black54);
+    final fallback =
+        Icon(Icons.live_tv, size: size * 0.55, color: Colors.black54);
     return Container(
       width: size,
       height: size,
@@ -68,12 +104,12 @@ class ChannelListScreen extends ConsumerWidget {
   }
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final async = ref.watch(liveByCategoryProvider(category.name));
+  Widget build(BuildContext context) {
+    final async = ref.watch(liveByCategoryProvider(widget.category.name));
     final grid = ref.watch(channelGridProvider);
     return Scaffold(
       appBar: AppBar(
-        title: Text(category.name),
+        title: Text(widget.category.name),
         actions: [
           IconButton(
             icon: Icon(grid ? Icons.view_list : Icons.grid_view),
@@ -85,19 +121,86 @@ class ChannelListScreen extends ConsumerWidget {
       body: async.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, _) => Center(child: Text('Error: $e')),
-        data: (items) => grid
-            ? _buildGrid(context, ref, items)
-            : _buildList(context, ref, items),
+        data: (items) => LayoutBuilder(
+          builder: (context, constraints) {
+            final wide = constraints.maxWidth >= _kPreviewBreakpoint;
+            final content = grid
+                ? _buildGrid(context, items, wide)
+                : _buildList(context, items, wide);
+            if (!wide) return content;
+            return Row(
+              children: [
+                Expanded(child: content),
+                const VerticalDivider(width: 1),
+                SizedBox(width: 380, child: _previewPanel()),
+              ],
+            );
+          },
+        ),
       ),
     );
   }
 
-  Widget _buildList(BuildContext context, WidgetRef ref, List<MediaItem> items) {
+  /// Al tocar un canal: preview si hay panel, o pantalla completa si no.
+  void _onTap(MediaItem it, bool wide) => wide ? _preview(it) : _fullscreen(it);
+
+  Widget _previewPanel() {
+    final sel = _selected;
+    if (sel == null || _previewVideo == null) {
+      return const Center(
+        child: Padding(
+          padding: EdgeInsets.all(24),
+          child: Text(
+            'Selecciona un canal para previsualizar qué están emitiendo',
+            textAlign: TextAlign.center,
+          ),
+        ),
+      );
+    }
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        AspectRatio(
+          aspectRatio: 16 / 9,
+          child: Container(
+            color: Colors.black,
+            child: Video(controller: _previewVideo!, controls: NoVideoControls),
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.all(12),
+          child: Text(sel.name,
+              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+        ),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          child: Row(
+            children: [
+              FilledButton.icon(
+                onPressed: () => _fullscreen(sel),
+                icon: const Icon(Icons.fullscreen),
+                label: const Text('Pantalla completa'),
+              ),
+              const SizedBox(width: 8),
+              IconButton(
+                icon: Icon(
+                    sel.isFavorite ? Icons.favorite : Icons.favorite_border),
+                onPressed: () => _action('favorito', sel),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildList(BuildContext context, List<MediaItem> items, bool wide) {
     return ListView.builder(
       itemCount: items.length,
       itemBuilder: (_, i) {
         final it = items[i];
         return ListTile(
+          selected: _selected?.id == it.id,
           leading: _logo(it),
           title: Text(it.name),
           trailing: Row(
@@ -106,18 +209,18 @@ class ChannelListScreen extends ConsumerWidget {
               IconButton(
                 icon: Icon(
                     it.isFavorite ? Icons.favorite : Icons.favorite_border),
-                onPressed: () => _action(ref, 'favorito', it),
+                onPressed: () => _action('favorito', it),
               ),
-              _menu(ref, it),
+              _menu(it),
             ],
           ),
-          onTap: () => _play(context, it),
+          onTap: () => _onTap(it, wide),
         );
       },
     );
   }
 
-  Widget _buildGrid(BuildContext context, WidgetRef ref, List<MediaItem> items) {
+  Widget _buildGrid(BuildContext context, List<MediaItem> items, bool wide) {
     return GridView.builder(
       padding: const EdgeInsets.all(8),
       gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
@@ -129,10 +232,14 @@ class ChannelListScreen extends ConsumerWidget {
       itemCount: items.length,
       itemBuilder: (_, i) {
         final it = items[i];
+        final selected = _selected?.id == it.id;
         return Card(
           clipBehavior: Clip.antiAlias,
+          color: selected
+              ? Theme.of(context).colorScheme.primaryContainer
+              : null,
           child: InkWell(
-            onTap: () => _play(context, it),
+            onTap: () => _onTap(it, wide),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
@@ -160,9 +267,9 @@ class ChannelListScreen extends ConsumerWidget {
                       icon: Icon(it.isFavorite
                           ? Icons.favorite
                           : Icons.favorite_border),
-                      onPressed: () => _action(ref, 'favorito', it),
+                      onPressed: () => _action('favorito', it),
                     ),
-                    _menu(ref, it),
+                    _menu(it),
                   ],
                 ),
               ],
