@@ -48,8 +48,8 @@ class ContinueWatchingRow extends ConsumerWidget {
                       ? Icons.theaters
                       : Icons.movie,
                   watchedFraction: it.watchedFraction.toDouble(),
-                  onTap: () {
-                    openPlayer(context, it);
+                  onTap: () async {
+                    await openPlayer(context, it);
                     // Al volver, refresca el progreso.
                     ref.invalidate(continueWatchingProvider);
                   },

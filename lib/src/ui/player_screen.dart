@@ -24,6 +24,8 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
   late final VideoController _video;
   final List<StreamSubscription> _subs = [];
   bool _seeked = false;
+  bool _savedLoaded = false;
+  int _savedPosition = 0;
   int _lastSaved = 0;
   int _positionSeconds = 0;
   Duration _duration = Duration.zero;
@@ -63,18 +65,31 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     );
   }
 
-  /// Configura la lógica de reanudar: al conocer la duración salta a la
-  /// posición guardada (si es válida) y guarda el progreso cada ~10s.
+  /// Configura la lógica de reanudar: lee la posición guardada de la BD (fuente
+  /// de verdad; el dato del grid puede estar obsoleto), y al conocer la duración
+  /// salta a esa posición. Guarda el progreso cada ~10s.
   void _setupResume() {
-    final saved = widget.item.positionSeconds;
+    _savedPosition = widget.item.positionSeconds; // provisional hasta leer BD
+    ref
+        .read(playlistRepositoryProvider)
+        .progress(widget.item.id)
+        .then((s) {
+      if (s > 0) _savedPosition = s;
+      _savedLoaded = true;
+      _maybeSeek();
+    }).catchError((_) {
+      _savedLoaded = true;
+      _maybeSeek();
+    });
+
     final player = _ctrl.player;
     _subs.add(player.stream.duration.listen((d) {
       _duration = d;
-      _maybeSeek(saved);
+      _maybeSeek();
     }));
     _subs.add(player.stream.position.listen((pos) {
       _positionSeconds = pos.inSeconds;
-      _maybeSeek(saved);
+      _maybeSeek();
       // Guarda cada 10s de avance, evitando escrituras excesivas.
       if ((_positionSeconds - _lastSaved).abs() >= 10) {
         _lastSaved = _positionSeconds;
@@ -83,15 +98,14 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     }));
   }
 
-  /// Salta a [saved] una sola vez, cuando ya se conoce la duración y la
-  /// posición guardada está entre 5s y (duración - 30s).
-  void _maybeSeek(int saved) {
-    if (_seeked || _duration.inSeconds <= 0) return;
+  /// Salta a la posición guardada una sola vez, cuando ya se ha leído de la BD,
+  /// se conoce la duración y la posición está entre 5s y (duración - 30s).
+  void _maybeSeek() {
+    if (_seeked || !_savedLoaded || _duration.inSeconds <= 0) return;
+    _seeked = true;
+    final saved = _savedPosition;
     if (saved > 5 && saved < _duration.inSeconds - 30) {
-      _seeked = true;
       _ctrl.player.seek(Duration(seconds: saved));
-    } else {
-      _seeked = true; // no hay nada que reanudar
     }
   }
 
@@ -120,11 +134,19 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
 
   @override
   void dispose() {
-    _save();
+    // 1) Cortar el audio LO PRIMERO, pase lo que pase con el resto.
+    final ctrl = _ctrl;
+    ctrl.player.setVolume(0);
+    ctrl.player.pause();
+    // 2) Guardar progreso sin bloquear (si falla, no impide el corte de audio).
+    try {
+      _save();
+    } catch (_) {}
+    // 3) Cancelar suscripciones y liberar el reproductor.
     for (final s in _subs) {
       s.cancel();
     }
-    _ctrl.dispose();
+    ctrl.dispose();
     super.dispose();
   }
 

@@ -118,8 +118,10 @@ class _MovieGridScreenState extends ConsumerState<MovieGridScreen> {
                       posterUrl: it.logoUrl,
                       watchedFraction: it.watchedFraction.toDouble(),
                       favorite: it.isFavorite,
-                      onTap: () {
-                        openPlayer(context, it);
+                      onTap: () async {
+                        await openPlayer(context, it);
+                        ref.invalidate(
+                            moviesByCategoryProvider(widget.category.name));
                         ref.invalidate(continueWatchingProvider);
                       },
                       onLongPress: () => _menu(it),
