@@ -9,6 +9,8 @@ class MediaItem {
   final String? groupTitle;
   final ContentType type;
   final bool isFavorite;
+  final bool isHidden;
+  final bool isDeleted;
 
   const MediaItem({
     required this.id,
@@ -19,9 +21,12 @@ class MediaItem {
     this.groupTitle,
     this.type = ContentType.unknown,
     this.isFavorite = false,
+    this.isHidden = false,
+    this.isDeleted = false,
   });
 
-  MediaItem copyWith({bool? isFavorite}) => MediaItem(
+  MediaItem copyWith({bool? isFavorite, bool? isHidden, bool? isDeleted}) =>
+      MediaItem(
         id: id,
         name: name,
         streamUrl: streamUrl,
@@ -30,5 +35,7 @@ class MediaItem {
         groupTitle: groupTitle,
         type: type,
         isFavorite: isFavorite ?? this.isFavorite,
+        isHidden: isHidden ?? this.isHidden,
+        isDeleted: isDeleted ?? this.isDeleted,
       );
 }

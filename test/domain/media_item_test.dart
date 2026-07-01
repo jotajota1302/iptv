@@ -17,4 +17,15 @@ void main() {
     expect(fav.name, 'Canal');
     expect(item.isFavorite, false);
   });
+
+  test('copyWith cambia isHidden e isDeleted de forma independiente', () {
+    const item = MediaItem(id: '1', name: 'C', streamUrl: 'u');
+    final hidden = item.copyWith(isHidden: true);
+    expect(hidden.isHidden, true);
+    expect(hidden.isDeleted, false);
+    expect(hidden.isFavorite, false);
+    final deleted = item.copyWith(isDeleted: true);
+    expect(deleted.isDeleted, true);
+    expect(deleted.isHidden, false);
+  });
 }

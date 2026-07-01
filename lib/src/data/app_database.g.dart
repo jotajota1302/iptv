@@ -92,6 +92,36 @@ class $ItemsTable extends Items with TableInfo<$ItemsTable, Item> {
     ),
     defaultValue: const Constant(false),
   );
+  static const VerificationMeta _isHiddenMeta = const VerificationMeta(
+    'isHidden',
+  );
+  @override
+  late final GeneratedColumn<bool> isHidden = GeneratedColumn<bool>(
+    'is_hidden',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("is_hidden" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
+  static const VerificationMeta _isDeletedMeta = const VerificationMeta(
+    'isDeleted',
+  );
+  @override
+  late final GeneratedColumn<bool> isDeleted = GeneratedColumn<bool>(
+    'is_deleted',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("is_deleted" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -102,6 +132,8 @@ class $ItemsTable extends Items with TableInfo<$ItemsTable, Item> {
     groupTitle,
     type,
     isFavorite,
+    isHidden,
+    isDeleted,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -168,6 +200,18 @@ class $ItemsTable extends Items with TableInfo<$ItemsTable, Item> {
         isFavorite.isAcceptableOrUnknown(data['is_favorite']!, _isFavoriteMeta),
       );
     }
+    if (data.containsKey('is_hidden')) {
+      context.handle(
+        _isHiddenMeta,
+        isHidden.isAcceptableOrUnknown(data['is_hidden']!, _isHiddenMeta),
+      );
+    }
+    if (data.containsKey('is_deleted')) {
+      context.handle(
+        _isDeletedMeta,
+        isDeleted.isAcceptableOrUnknown(data['is_deleted']!, _isDeletedMeta),
+      );
+    }
     return context;
   }
 
@@ -209,6 +253,14 @@ class $ItemsTable extends Items with TableInfo<$ItemsTable, Item> {
         DriftSqlType.bool,
         data['${effectivePrefix}is_favorite'],
       )!,
+      isHidden: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}is_hidden'],
+      )!,
+      isDeleted: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}is_deleted'],
+      )!,
     );
   }
 
@@ -227,6 +279,8 @@ class Item extends DataClass implements Insertable<Item> {
   final String? groupTitle;
   final int type;
   final bool isFavorite;
+  final bool isHidden;
+  final bool isDeleted;
   const Item({
     required this.id,
     required this.name,
@@ -236,6 +290,8 @@ class Item extends DataClass implements Insertable<Item> {
     this.groupTitle,
     required this.type,
     required this.isFavorite,
+    required this.isHidden,
+    required this.isDeleted,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -254,6 +310,8 @@ class Item extends DataClass implements Insertable<Item> {
     }
     map['type'] = Variable<int>(type);
     map['is_favorite'] = Variable<bool>(isFavorite);
+    map['is_hidden'] = Variable<bool>(isHidden);
+    map['is_deleted'] = Variable<bool>(isDeleted);
     return map;
   }
 
@@ -273,6 +331,8 @@ class Item extends DataClass implements Insertable<Item> {
           : Value(groupTitle),
       type: Value(type),
       isFavorite: Value(isFavorite),
+      isHidden: Value(isHidden),
+      isDeleted: Value(isDeleted),
     );
   }
 
@@ -290,6 +350,8 @@ class Item extends DataClass implements Insertable<Item> {
       groupTitle: serializer.fromJson<String?>(json['groupTitle']),
       type: serializer.fromJson<int>(json['type']),
       isFavorite: serializer.fromJson<bool>(json['isFavorite']),
+      isHidden: serializer.fromJson<bool>(json['isHidden']),
+      isDeleted: serializer.fromJson<bool>(json['isDeleted']),
     );
   }
   @override
@@ -304,6 +366,8 @@ class Item extends DataClass implements Insertable<Item> {
       'groupTitle': serializer.toJson<String?>(groupTitle),
       'type': serializer.toJson<int>(type),
       'isFavorite': serializer.toJson<bool>(isFavorite),
+      'isHidden': serializer.toJson<bool>(isHidden),
+      'isDeleted': serializer.toJson<bool>(isDeleted),
     };
   }
 
@@ -316,6 +380,8 @@ class Item extends DataClass implements Insertable<Item> {
     Value<String?> groupTitle = const Value.absent(),
     int? type,
     bool? isFavorite,
+    bool? isHidden,
+    bool? isDeleted,
   }) => Item(
     id: id ?? this.id,
     name: name ?? this.name,
@@ -325,6 +391,8 @@ class Item extends DataClass implements Insertable<Item> {
     groupTitle: groupTitle.present ? groupTitle.value : this.groupTitle,
     type: type ?? this.type,
     isFavorite: isFavorite ?? this.isFavorite,
+    isHidden: isHidden ?? this.isHidden,
+    isDeleted: isDeleted ?? this.isDeleted,
   );
   Item copyWithCompanion(ItemsCompanion data) {
     return Item(
@@ -340,6 +408,8 @@ class Item extends DataClass implements Insertable<Item> {
       isFavorite: data.isFavorite.present
           ? data.isFavorite.value
           : this.isFavorite,
+      isHidden: data.isHidden.present ? data.isHidden.value : this.isHidden,
+      isDeleted: data.isDeleted.present ? data.isDeleted.value : this.isDeleted,
     );
   }
 
@@ -353,7 +423,9 @@ class Item extends DataClass implements Insertable<Item> {
           ..write('tvgId: $tvgId, ')
           ..write('groupTitle: $groupTitle, ')
           ..write('type: $type, ')
-          ..write('isFavorite: $isFavorite')
+          ..write('isFavorite: $isFavorite, ')
+          ..write('isHidden: $isHidden, ')
+          ..write('isDeleted: $isDeleted')
           ..write(')'))
         .toString();
   }
@@ -368,6 +440,8 @@ class Item extends DataClass implements Insertable<Item> {
     groupTitle,
     type,
     isFavorite,
+    isHidden,
+    isDeleted,
   );
   @override
   bool operator ==(Object other) =>
@@ -380,7 +454,9 @@ class Item extends DataClass implements Insertable<Item> {
           other.tvgId == this.tvgId &&
           other.groupTitle == this.groupTitle &&
           other.type == this.type &&
-          other.isFavorite == this.isFavorite);
+          other.isFavorite == this.isFavorite &&
+          other.isHidden == this.isHidden &&
+          other.isDeleted == this.isDeleted);
 }
 
 class ItemsCompanion extends UpdateCompanion<Item> {
@@ -392,6 +468,8 @@ class ItemsCompanion extends UpdateCompanion<Item> {
   final Value<String?> groupTitle;
   final Value<int> type;
   final Value<bool> isFavorite;
+  final Value<bool> isHidden;
+  final Value<bool> isDeleted;
   final Value<int> rowid;
   const ItemsCompanion({
     this.id = const Value.absent(),
@@ -402,6 +480,8 @@ class ItemsCompanion extends UpdateCompanion<Item> {
     this.groupTitle = const Value.absent(),
     this.type = const Value.absent(),
     this.isFavorite = const Value.absent(),
+    this.isHidden = const Value.absent(),
+    this.isDeleted = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   ItemsCompanion.insert({
@@ -413,6 +493,8 @@ class ItemsCompanion extends UpdateCompanion<Item> {
     this.groupTitle = const Value.absent(),
     required int type,
     this.isFavorite = const Value.absent(),
+    this.isHidden = const Value.absent(),
+    this.isDeleted = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
        name = Value(name),
@@ -427,6 +509,8 @@ class ItemsCompanion extends UpdateCompanion<Item> {
     Expression<String>? groupTitle,
     Expression<int>? type,
     Expression<bool>? isFavorite,
+    Expression<bool>? isHidden,
+    Expression<bool>? isDeleted,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -438,6 +522,8 @@ class ItemsCompanion extends UpdateCompanion<Item> {
       if (groupTitle != null) 'group_title': groupTitle,
       if (type != null) 'type': type,
       if (isFavorite != null) 'is_favorite': isFavorite,
+      if (isHidden != null) 'is_hidden': isHidden,
+      if (isDeleted != null) 'is_deleted': isDeleted,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -451,6 +537,8 @@ class ItemsCompanion extends UpdateCompanion<Item> {
     Value<String?>? groupTitle,
     Value<int>? type,
     Value<bool>? isFavorite,
+    Value<bool>? isHidden,
+    Value<bool>? isDeleted,
     Value<int>? rowid,
   }) {
     return ItemsCompanion(
@@ -462,6 +550,8 @@ class ItemsCompanion extends UpdateCompanion<Item> {
       groupTitle: groupTitle ?? this.groupTitle,
       type: type ?? this.type,
       isFavorite: isFavorite ?? this.isFavorite,
+      isHidden: isHidden ?? this.isHidden,
+      isDeleted: isDeleted ?? this.isDeleted,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -493,6 +583,12 @@ class ItemsCompanion extends UpdateCompanion<Item> {
     if (isFavorite.present) {
       map['is_favorite'] = Variable<bool>(isFavorite.value);
     }
+    if (isHidden.present) {
+      map['is_hidden'] = Variable<bool>(isHidden.value);
+    }
+    if (isDeleted.present) {
+      map['is_deleted'] = Variable<bool>(isDeleted.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -510,6 +606,8 @@ class ItemsCompanion extends UpdateCompanion<Item> {
           ..write('groupTitle: $groupTitle, ')
           ..write('type: $type, ')
           ..write('isFavorite: $isFavorite, ')
+          ..write('isHidden: $isHidden, ')
+          ..write('isDeleted: $isDeleted, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -537,6 +635,8 @@ typedef $$ItemsTableCreateCompanionBuilder =
       Value<String?> groupTitle,
       required int type,
       Value<bool> isFavorite,
+      Value<bool> isHidden,
+      Value<bool> isDeleted,
       Value<int> rowid,
     });
 typedef $$ItemsTableUpdateCompanionBuilder =
@@ -549,6 +649,8 @@ typedef $$ItemsTableUpdateCompanionBuilder =
       Value<String?> groupTitle,
       Value<int> type,
       Value<bool> isFavorite,
+      Value<bool> isHidden,
+      Value<bool> isDeleted,
       Value<int> rowid,
     });
 
@@ -597,6 +699,16 @@ class $$ItemsTableFilterComposer extends Composer<_$AppDatabase, $ItemsTable> {
 
   ColumnFilters<bool> get isFavorite => $composableBuilder(
     column: $table.isFavorite,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get isHidden => $composableBuilder(
+    column: $table.isHidden,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get isDeleted => $composableBuilder(
+    column: $table.isDeleted,
     builder: (column) => ColumnFilters(column),
   );
 }
@@ -649,6 +761,16 @@ class $$ItemsTableOrderingComposer
     column: $table.isFavorite,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<bool> get isHidden => $composableBuilder(
+    column: $table.isHidden,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get isDeleted => $composableBuilder(
+    column: $table.isDeleted,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
 class $$ItemsTableAnnotationComposer
@@ -687,6 +809,12 @@ class $$ItemsTableAnnotationComposer
     column: $table.isFavorite,
     builder: (column) => column,
   );
+
+  GeneratedColumn<bool> get isHidden =>
+      $composableBuilder(column: $table.isHidden, builder: (column) => column);
+
+  GeneratedColumn<bool> get isDeleted =>
+      $composableBuilder(column: $table.isDeleted, builder: (column) => column);
 }
 
 class $$ItemsTableTableManager
@@ -725,6 +853,8 @@ class $$ItemsTableTableManager
                 Value<String?> groupTitle = const Value.absent(),
                 Value<int> type = const Value.absent(),
                 Value<bool> isFavorite = const Value.absent(),
+                Value<bool> isHidden = const Value.absent(),
+                Value<bool> isDeleted = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => ItemsCompanion(
                 id: id,
@@ -735,6 +865,8 @@ class $$ItemsTableTableManager
                 groupTitle: groupTitle,
                 type: type,
                 isFavorite: isFavorite,
+                isHidden: isHidden,
+                isDeleted: isDeleted,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -747,6 +879,8 @@ class $$ItemsTableTableManager
                 Value<String?> groupTitle = const Value.absent(),
                 required int type,
                 Value<bool> isFavorite = const Value.absent(),
+                Value<bool> isHidden = const Value.absent(),
+                Value<bool> isDeleted = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => ItemsCompanion.insert(
                 id: id,
@@ -757,6 +891,8 @@ class $$ItemsTableTableManager
                 groupTitle: groupTitle,
                 type: type,
                 isFavorite: isFavorite,
+                isHidden: isHidden,
+                isDeleted: isDeleted,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0
