@@ -3,7 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../app/providers.dart';
 import '../domain/category.dart';
 import '../domain/media_item.dart';
-import 'play_helpers.dart';
+import 'movie_detail_screen.dart';
 import 'vod_poster.dart';
 
 /// Cuadrícula de carátulas de películas (poster 2:3) con buscador, progreso
@@ -119,7 +119,9 @@ class _MovieGridScreenState extends ConsumerState<MovieGridScreen> {
                       watchedFraction: it.watchedFraction.toDouble(),
                       favorite: it.isFavorite,
                       onTap: () async {
-                        await openPlayer(context, it);
+                        await Navigator.of(context).push(MaterialPageRoute(
+                          builder: (_) => MovieDetailScreen(item: it),
+                        ));
                         ref.invalidate(
                             moviesByCategoryProvider(widget.category.name));
                         ref.invalidate(continueWatchingProvider);

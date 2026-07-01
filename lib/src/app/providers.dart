@@ -7,6 +7,7 @@ import '../data/epg_service.dart';
 import '../data/m3u_source.dart';
 import '../data/playlist_repository.dart';
 import '../data/series_grouper.dart';
+import '../data/vod_info_service.dart';
 import '../domain/category.dart';
 import '../domain/content_type.dart';
 import '../domain/media_item.dart';
@@ -111,6 +112,15 @@ final seriesGroupsByCategoryProvider =
 
 /// Servicio de guía de programación (EPG) via API Xtream.
 final epgServiceProvider = Provider<EpgService>((_) => EpgService());
+
+/// Servicio de fichas de películas (metadatos) via API Xtream.
+final vodInfoServiceProvider = Provider<VodInfoService>((_) => VodInfoService());
+
+/// Ficha (sinopsis, año, valoración...) de la película cuyo streamUrl se pasa.
+final vodInfoProvider =
+    FutureProvider.family<VodInfo?, String>((ref, streamUrl) {
+  return ref.watch(vodInfoServiceProvider).fetch(streamUrl);
+});
 
 /// Programación corta (actual y siguientes) del canal cuyo streamUrl se pasa.
 /// Las credenciales se derivan de la propia URL del stream. Best-effort.
