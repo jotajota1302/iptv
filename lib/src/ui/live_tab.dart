@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../app/providers.dart';
 import '../domain/category.dart';
 import 'channel_list_screen.dart';
+import 'widgets/category_tile.dart';
 
 class LiveTab extends ConsumerWidget {
   const LiveTab({super.key});
@@ -42,7 +43,7 @@ class LiveTab extends ConsumerWidget {
         ),
         Expanded(
           child: async.when(
-            loading: () => const Center(child: CircularProgressIndicator()),
+            loading: () => const CategoryListSkeleton(),
             error: (e, _) => Center(child: Text('Error: $e')),
             data: (cats) {
               if (cats.isEmpty) {
@@ -78,13 +79,12 @@ class LiveTab extends ConsumerWidget {
       itemCount: cats.length,
       itemBuilder: (_, i) {
         final cat = cats[i];
-        return ListTile(
-          title: Text(cat.name),
-          trailing: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [Text('${cat.itemCount}'), _menu(ref, cat)],
-          ),
+        return CategoryTile(
+          icon: Icons.live_tv_outlined,
+          name: cat.name,
+          count: cat.itemCount,
           onTap: () => _open(context, cat),
+          onHide: () => _hide(ref, cat),
         );
       },
     );

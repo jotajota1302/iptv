@@ -17,6 +17,7 @@ void main() {
       ],
       child: const MaterialApp(home: Scaffold(body: SearchTab())),
     ));
+    await tester.enterText(find.byType(TextField), 'la');
     await tester.pumpAndSettle();
     expect(find.text('La 1'), findsOneWidget);
   });
@@ -35,6 +36,7 @@ void main() {
       ],
       child: const MaterialApp(home: Scaffold(body: SearchTab())),
     ));
+    await tester.enterText(find.byType(TextField), 'o');
     await tester.pumpAndSettle();
     expect(find.text('Canal Uno'), findsOneWidget);
     expect(find.text('Peli Dos'), findsOneWidget);
