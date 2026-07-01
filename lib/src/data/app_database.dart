@@ -23,6 +23,7 @@ class Items extends Table {
   IntColumn get positionSeconds => integer().withDefault(const Constant(0))();
   IntColumn get durationSeconds => integer().withDefault(const Constant(0))();
   IntColumn get lastWatchedAt => integer().withDefault(const Constant(0))();
+  IntColumn get addedAt => integer().withDefault(const Constant(0))();
 
   @override
   Set<Column> get primaryKey => {id};
@@ -34,7 +35,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(super.e);
 
   @override
-  int get schemaVersion => 4;
+  int get schemaVersion => 5;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -49,6 +50,9 @@ class AppDatabase extends _$AppDatabase {
           if (from < 4) {
             await m.addColumn(items, items.durationSeconds);
             await m.addColumn(items, items.lastWatchedAt);
+          }
+          if (from < 5) {
+            await m.addColumn(items, items.addedAt);
           }
         },
       );
@@ -66,12 +70,14 @@ class AppDatabase extends _$AppDatabase {
         isDeleted: r.isDeleted,
         positionSeconds: r.positionSeconds,
         durationSeconds: r.durationSeconds,
+        addedAt: r.addedAt,
       );
 
   /// Reemplaza la caché preservando los flags de usuario (favorito/oculto/
   /// borrado) de los items que ya existían, identificados por [id].
   Future<void> replaceItems(List<MediaItem> newItems) async {
     final existing = await select(items).get();
+    final now = DateTime.now().millisecondsSinceEpoch;
     final flags = {
       for (final r in existing)
         r.id: (
@@ -81,6 +87,7 @@ class AppDatabase extends _$AppDatabase {
           pos: r.positionSeconds,
           dur: r.durationSeconds,
           watched: r.lastWatchedAt,
+          added: r.addedAt,
         ),
     };
     await batch((b) {
@@ -103,6 +110,9 @@ class AppDatabase extends _$AppDatabase {
             positionSeconds: Value(f?.pos ?? m.positionSeconds),
             durationSeconds: Value(f?.dur ?? m.durationSeconds),
             lastWatchedAt: Value(f?.watched ?? 0),
+            // Nuevos items reciben la marca de tiempo actual (para "novedades");
+            // los ya existentes conservan su fecha original.
+            addedAt: Value(f?.added ?? now),
           );
         }),
         mode: InsertMode.insertOrReplace,

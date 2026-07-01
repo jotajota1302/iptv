@@ -158,6 +158,18 @@ class $ItemsTable extends Items with TableInfo<$ItemsTable, Item> {
     requiredDuringInsert: false,
     defaultValue: const Constant(0),
   );
+  static const VerificationMeta _addedAtMeta = const VerificationMeta(
+    'addedAt',
+  );
+  @override
+  late final GeneratedColumn<int> addedAt = GeneratedColumn<int>(
+    'added_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -173,6 +185,7 @@ class $ItemsTable extends Items with TableInfo<$ItemsTable, Item> {
     positionSeconds,
     durationSeconds,
     lastWatchedAt,
+    addedAt,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -278,6 +291,12 @@ class $ItemsTable extends Items with TableInfo<$ItemsTable, Item> {
         ),
       );
     }
+    if (data.containsKey('added_at')) {
+      context.handle(
+        _addedAtMeta,
+        addedAt.isAcceptableOrUnknown(data['added_at']!, _addedAtMeta),
+      );
+    }
     return context;
   }
 
@@ -339,6 +358,10 @@ class $ItemsTable extends Items with TableInfo<$ItemsTable, Item> {
         DriftSqlType.int,
         data['${effectivePrefix}last_watched_at'],
       )!,
+      addedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}added_at'],
+      )!,
     );
   }
 
@@ -362,6 +385,7 @@ class Item extends DataClass implements Insertable<Item> {
   final int positionSeconds;
   final int durationSeconds;
   final int lastWatchedAt;
+  final int addedAt;
   const Item({
     required this.id,
     required this.name,
@@ -376,6 +400,7 @@ class Item extends DataClass implements Insertable<Item> {
     required this.positionSeconds,
     required this.durationSeconds,
     required this.lastWatchedAt,
+    required this.addedAt,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -399,6 +424,7 @@ class Item extends DataClass implements Insertable<Item> {
     map['position_seconds'] = Variable<int>(positionSeconds);
     map['duration_seconds'] = Variable<int>(durationSeconds);
     map['last_watched_at'] = Variable<int>(lastWatchedAt);
+    map['added_at'] = Variable<int>(addedAt);
     return map;
   }
 
@@ -423,6 +449,7 @@ class Item extends DataClass implements Insertable<Item> {
       positionSeconds: Value(positionSeconds),
       durationSeconds: Value(durationSeconds),
       lastWatchedAt: Value(lastWatchedAt),
+      addedAt: Value(addedAt),
     );
   }
 
@@ -445,6 +472,7 @@ class Item extends DataClass implements Insertable<Item> {
       positionSeconds: serializer.fromJson<int>(json['positionSeconds']),
       durationSeconds: serializer.fromJson<int>(json['durationSeconds']),
       lastWatchedAt: serializer.fromJson<int>(json['lastWatchedAt']),
+      addedAt: serializer.fromJson<int>(json['addedAt']),
     );
   }
   @override
@@ -464,6 +492,7 @@ class Item extends DataClass implements Insertable<Item> {
       'positionSeconds': serializer.toJson<int>(positionSeconds),
       'durationSeconds': serializer.toJson<int>(durationSeconds),
       'lastWatchedAt': serializer.toJson<int>(lastWatchedAt),
+      'addedAt': serializer.toJson<int>(addedAt),
     };
   }
 
@@ -481,6 +510,7 @@ class Item extends DataClass implements Insertable<Item> {
     int? positionSeconds,
     int? durationSeconds,
     int? lastWatchedAt,
+    int? addedAt,
   }) => Item(
     id: id ?? this.id,
     name: name ?? this.name,
@@ -495,6 +525,7 @@ class Item extends DataClass implements Insertable<Item> {
     positionSeconds: positionSeconds ?? this.positionSeconds,
     durationSeconds: durationSeconds ?? this.durationSeconds,
     lastWatchedAt: lastWatchedAt ?? this.lastWatchedAt,
+    addedAt: addedAt ?? this.addedAt,
   );
   Item copyWithCompanion(ItemsCompanion data) {
     return Item(
@@ -521,6 +552,7 @@ class Item extends DataClass implements Insertable<Item> {
       lastWatchedAt: data.lastWatchedAt.present
           ? data.lastWatchedAt.value
           : this.lastWatchedAt,
+      addedAt: data.addedAt.present ? data.addedAt.value : this.addedAt,
     );
   }
 
@@ -539,7 +571,8 @@ class Item extends DataClass implements Insertable<Item> {
           ..write('isDeleted: $isDeleted, ')
           ..write('positionSeconds: $positionSeconds, ')
           ..write('durationSeconds: $durationSeconds, ')
-          ..write('lastWatchedAt: $lastWatchedAt')
+          ..write('lastWatchedAt: $lastWatchedAt, ')
+          ..write('addedAt: $addedAt')
           ..write(')'))
         .toString();
   }
@@ -559,6 +592,7 @@ class Item extends DataClass implements Insertable<Item> {
     positionSeconds,
     durationSeconds,
     lastWatchedAt,
+    addedAt,
   );
   @override
   bool operator ==(Object other) =>
@@ -576,7 +610,8 @@ class Item extends DataClass implements Insertable<Item> {
           other.isDeleted == this.isDeleted &&
           other.positionSeconds == this.positionSeconds &&
           other.durationSeconds == this.durationSeconds &&
-          other.lastWatchedAt == this.lastWatchedAt);
+          other.lastWatchedAt == this.lastWatchedAt &&
+          other.addedAt == this.addedAt);
 }
 
 class ItemsCompanion extends UpdateCompanion<Item> {
@@ -593,6 +628,7 @@ class ItemsCompanion extends UpdateCompanion<Item> {
   final Value<int> positionSeconds;
   final Value<int> durationSeconds;
   final Value<int> lastWatchedAt;
+  final Value<int> addedAt;
   final Value<int> rowid;
   const ItemsCompanion({
     this.id = const Value.absent(),
@@ -608,6 +644,7 @@ class ItemsCompanion extends UpdateCompanion<Item> {
     this.positionSeconds = const Value.absent(),
     this.durationSeconds = const Value.absent(),
     this.lastWatchedAt = const Value.absent(),
+    this.addedAt = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   ItemsCompanion.insert({
@@ -624,6 +661,7 @@ class ItemsCompanion extends UpdateCompanion<Item> {
     this.positionSeconds = const Value.absent(),
     this.durationSeconds = const Value.absent(),
     this.lastWatchedAt = const Value.absent(),
+    this.addedAt = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
        name = Value(name),
@@ -643,6 +681,7 @@ class ItemsCompanion extends UpdateCompanion<Item> {
     Expression<int>? positionSeconds,
     Expression<int>? durationSeconds,
     Expression<int>? lastWatchedAt,
+    Expression<int>? addedAt,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -659,6 +698,7 @@ class ItemsCompanion extends UpdateCompanion<Item> {
       if (positionSeconds != null) 'position_seconds': positionSeconds,
       if (durationSeconds != null) 'duration_seconds': durationSeconds,
       if (lastWatchedAt != null) 'last_watched_at': lastWatchedAt,
+      if (addedAt != null) 'added_at': addedAt,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -677,6 +717,7 @@ class ItemsCompanion extends UpdateCompanion<Item> {
     Value<int>? positionSeconds,
     Value<int>? durationSeconds,
     Value<int>? lastWatchedAt,
+    Value<int>? addedAt,
     Value<int>? rowid,
   }) {
     return ItemsCompanion(
@@ -693,6 +734,7 @@ class ItemsCompanion extends UpdateCompanion<Item> {
       positionSeconds: positionSeconds ?? this.positionSeconds,
       durationSeconds: durationSeconds ?? this.durationSeconds,
       lastWatchedAt: lastWatchedAt ?? this.lastWatchedAt,
+      addedAt: addedAt ?? this.addedAt,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -739,6 +781,9 @@ class ItemsCompanion extends UpdateCompanion<Item> {
     if (lastWatchedAt.present) {
       map['last_watched_at'] = Variable<int>(lastWatchedAt.value);
     }
+    if (addedAt.present) {
+      map['added_at'] = Variable<int>(addedAt.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -761,6 +806,7 @@ class ItemsCompanion extends UpdateCompanion<Item> {
           ..write('positionSeconds: $positionSeconds, ')
           ..write('durationSeconds: $durationSeconds, ')
           ..write('lastWatchedAt: $lastWatchedAt, ')
+          ..write('addedAt: $addedAt, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -793,6 +839,7 @@ typedef $$ItemsTableCreateCompanionBuilder =
       Value<int> positionSeconds,
       Value<int> durationSeconds,
       Value<int> lastWatchedAt,
+      Value<int> addedAt,
       Value<int> rowid,
     });
 typedef $$ItemsTableUpdateCompanionBuilder =
@@ -810,6 +857,7 @@ typedef $$ItemsTableUpdateCompanionBuilder =
       Value<int> positionSeconds,
       Value<int> durationSeconds,
       Value<int> lastWatchedAt,
+      Value<int> addedAt,
       Value<int> rowid,
     });
 
@@ -883,6 +931,11 @@ class $$ItemsTableFilterComposer extends Composer<_$AppDatabase, $ItemsTable> {
 
   ColumnFilters<int> get lastWatchedAt => $composableBuilder(
     column: $table.lastWatchedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get addedAt => $composableBuilder(
+    column: $table.addedAt,
     builder: (column) => ColumnFilters(column),
   );
 }
@@ -960,6 +1013,11 @@ class $$ItemsTableOrderingComposer
     column: $table.lastWatchedAt,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<int> get addedAt => $composableBuilder(
+    column: $table.addedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
 class $$ItemsTableAnnotationComposer
@@ -1019,6 +1077,9 @@ class $$ItemsTableAnnotationComposer
     column: $table.lastWatchedAt,
     builder: (column) => column,
   );
+
+  GeneratedColumn<int> get addedAt =>
+      $composableBuilder(column: $table.addedAt, builder: (column) => column);
 }
 
 class $$ItemsTableTableManager
@@ -1062,6 +1123,7 @@ class $$ItemsTableTableManager
                 Value<int> positionSeconds = const Value.absent(),
                 Value<int> durationSeconds = const Value.absent(),
                 Value<int> lastWatchedAt = const Value.absent(),
+                Value<int> addedAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => ItemsCompanion(
                 id: id,
@@ -1077,6 +1139,7 @@ class $$ItemsTableTableManager
                 positionSeconds: positionSeconds,
                 durationSeconds: durationSeconds,
                 lastWatchedAt: lastWatchedAt,
+                addedAt: addedAt,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -1094,6 +1157,7 @@ class $$ItemsTableTableManager
                 Value<int> positionSeconds = const Value.absent(),
                 Value<int> durationSeconds = const Value.absent(),
                 Value<int> lastWatchedAt = const Value.absent(),
+                Value<int> addedAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => ItemsCompanion.insert(
                 id: id,
@@ -1109,6 +1173,7 @@ class $$ItemsTableTableManager
                 positionSeconds: positionSeconds,
                 durationSeconds: durationSeconds,
                 lastWatchedAt: lastWatchedAt,
+                addedAt: addedAt,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0

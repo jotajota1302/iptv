@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../app/providers.dart';
 import '../domain/category.dart';
+import '../domain/sort_mode.dart';
 import 'series_detail_screen.dart';
+import 'sort_menu.dart';
 import 'vod_poster.dart';
 
 /// Cuadrícula de series (carátula + título) de una categoría, con buscador.
@@ -22,8 +24,10 @@ class _SeriesGridScreenState extends ConsumerState<SeriesGridScreen> {
   Widget build(BuildContext context) {
     final async =
         ref.watch(seriesGroupsByCategoryProvider(widget.category.name));
+    final sort = ref.watch(sortModeProvider);
     return Scaffold(
-      appBar: AppBar(title: Text(widget.category.name)),
+      appBar: AppBar(
+          title: Text(widget.category.name), actions: const [SortMenu()]),
       body: Column(
         children: [
           Padding(
@@ -43,11 +47,19 @@ class _SeriesGridScreenState extends ConsumerState<SeriesGridScreen> {
               loading: () => const Center(child: CircularProgressIndicator()),
               error: (e, _) => Center(child: Text('Error: $e')),
               data: (all) {
-                final series = _query.isEmpty
+                final filtered = _query.isEmpty
                     ? all
                     : all
                         .where((s) => s.title.toLowerCase().contains(_query))
                         .toList();
+                final series = [...filtered];
+                if (sort == SortMode.nameDesc) {
+                  series.sort((a, b) =>
+                      b.title.toLowerCase().compareTo(a.title.toLowerCase()));
+                } else {
+                  series.sort((a, b) =>
+                      a.title.toLowerCase().compareTo(b.title.toLowerCase()));
+                }
                 if (series.isEmpty) {
                   return const Center(child: Text('Sin resultados'));
                 }

@@ -18,6 +18,9 @@ class MediaItem {
   /// Duración total en segundos (VOD), si se conoce. 0 = desconocida.
   final int durationSeconds;
 
+  /// Marca de tiempo (epoch ms) en que se añadió a la caché (para "novedades").
+  final int addedAt;
+
   const MediaItem({
     required this.id,
     required this.name,
@@ -31,6 +34,7 @@ class MediaItem {
     this.isDeleted = false,
     this.positionSeconds = 0,
     this.durationSeconds = 0,
+    this.addedAt = 0,
   });
 
   /// Fracción vista (0..1) si se conoce la duración; si no, 0.
@@ -56,5 +60,6 @@ class MediaItem {
         isDeleted: isDeleted ?? this.isDeleted,
         positionSeconds: positionSeconds ?? this.positionSeconds,
         durationSeconds: durationSeconds ?? this.durationSeconds,
+        addedAt: addedAt,
       );
 }

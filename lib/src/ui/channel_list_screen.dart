@@ -5,9 +5,11 @@ import 'package:media_kit_video/media_kit_video.dart';
 import '../app/providers.dart';
 import '../domain/category.dart';
 import '../domain/media_item.dart';
+import '../domain/sort_mode.dart';
 import '../player/media_kit_player_controller.dart';
 import 'channel_guide_screen.dart';
 import 'player_screen.dart';
+import 'sort_menu.dart';
 
 /// Ancho mínimo para mostrar el panel de preview lateral.
 const _kPreviewBreakpoint = 820.0;
@@ -112,10 +114,12 @@ class _ChannelListScreenState extends ConsumerState<ChannelListScreen> {
   Widget build(BuildContext context) {
     final async = ref.watch(liveByCategoryProvider(widget.category.name));
     final grid = ref.watch(channelGridProvider);
+    final sort = ref.watch(sortModeProvider);
     return Scaffold(
       appBar: AppBar(
         title: Text(widget.category.name),
         actions: [
+          const SortMenu(),
           IconButton(
             icon: Icon(grid ? Icons.view_list : Icons.grid_view),
             tooltip: grid ? 'Ver como lista' : 'Ver como cuadrícula',
@@ -126,8 +130,9 @@ class _ChannelListScreenState extends ConsumerState<ChannelListScreen> {
       body: async.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, _) => Center(child: Text('Error: $e')),
-        data: (items) => LayoutBuilder(
+        data: (all) => LayoutBuilder(
           builder: (context, constraints) {
+            final items = sortItems(all, sort);
             final wide = constraints.maxWidth >= _kPreviewBreakpoint;
             final content = grid
                 ? _buildGrid(context, items, wide)

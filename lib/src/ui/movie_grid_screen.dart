@@ -3,7 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../app/providers.dart';
 import '../domain/category.dart';
 import '../domain/media_item.dart';
+import '../domain/sort_mode.dart';
 import 'movie_detail_screen.dart';
+import 'sort_menu.dart';
 import 'vod_poster.dart';
 
 /// Cuadrícula de carátulas de películas (poster 2:3) con buscador, progreso
@@ -72,8 +74,10 @@ class _MovieGridScreenState extends ConsumerState<MovieGridScreen> {
   @override
   Widget build(BuildContext context) {
     final async = ref.watch(moviesByCategoryProvider(widget.category.name));
+    final sort = ref.watch(sortModeProvider);
     return Scaffold(
-      appBar: AppBar(title: Text(widget.category.name)),
+      appBar: AppBar(
+          title: Text(widget.category.name), actions: const [SortMenu()]),
       body: Column(
         children: [
           Padding(
@@ -93,11 +97,12 @@ class _MovieGridScreenState extends ConsumerState<MovieGridScreen> {
               loading: () => const Center(child: CircularProgressIndicator()),
               error: (e, _) => Center(child: Text('Error: $e')),
               data: (all) {
-                final movies = _query.isEmpty
+                final filtered = _query.isEmpty
                     ? all
                     : all
                         .where((m) => m.name.toLowerCase().contains(_query))
                         .toList();
+                final movies = sortItems(filtered, sort);
                 if (movies.isEmpty) {
                   return const Center(child: Text('Sin resultados'));
                 }

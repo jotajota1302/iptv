@@ -13,6 +13,7 @@ import '../domain/category.dart';
 import '../domain/content_type.dart';
 import '../domain/media_item.dart';
 import '../domain/series_group.dart';
+import '../domain/sort_mode.dart';
 
 final databaseProvider = Provider<AppDatabase>((ref) {
   final db = AppDatabase();
@@ -192,6 +193,17 @@ final hiddenCountsByTypeProvider =
 final continueWatchingProvider = FutureProvider<List<MediaItem>>((ref) {
   return ref.watch(playlistRepositoryProvider).continueWatching();
 });
+
+/// Modo de ordenación del contenido dentro de una categoría. Persistido.
+final sortModeProvider = StateProvider<SortMode>((ref) {
+  final i = ref.watch(sharedPrefsProvider).getInt('sort_mode') ?? 0;
+  return SortMode.values[i.clamp(0, SortMode.values.length - 1)];
+});
+
+void setSortMode(WidgetRef ref, SortMode mode) {
+  ref.read(sortModeProvider.notifier).state = mode;
+  ref.read(sharedPrefsProvider).setInt('sort_mode', mode.index);
+}
 
 /// Vista en cuadrícula (iconos) vs lista en la pantalla de canales. Persistido.
 final channelGridProvider = StateProvider<bool>(
