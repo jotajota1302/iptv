@@ -103,3 +103,12 @@ void setChannelGrid(WidgetRef ref, bool value) {
   ref.read(channelGridProvider.notifier).state = value;
   ref.read(sharedPrefsProvider).setBool('channel_grid', value);
 }
+
+/// Vista en cuadrícula vs lista en la pantalla de categorías de TV. Persistido.
+final categoryGridProvider = StateProvider<bool>(
+    (ref) => ref.watch(sharedPrefsProvider).getBool('category_grid') ?? false);
+
+void setCategoryGrid(WidgetRef ref, bool value) {
+  ref.read(categoryGridProvider.notifier).state = value;
+  ref.read(sharedPrefsProvider).setBool('category_grid', value);
+}

@@ -44,15 +44,28 @@ class ChannelListScreen extends ConsumerWidget {
         ],
       );
 
-  Widget _logo(MediaItem it, {double size = 48}) => it.logoUrl == null
-      ? Icon(Icons.live_tv, size: size)
-      : CachedNetworkImage(
-          imageUrl: it.logoUrl!,
-          width: size,
-          height: size,
-          fit: BoxFit.contain,
-          errorWidget: (_, _, _) => Icon(Icons.live_tv, size: size),
-        );
+  /// Logo sobre una placa clara uniforme: los logos de canales suelen estar
+  /// diseñados para fondo claro, así se ven bien y consistentes sobre el tema
+  /// oscuro (evita fondos feos/descuadrados).
+  Widget _logo(MediaItem it, {double size = 48}) {
+    final fallback = Icon(Icons.live_tv, size: size * 0.55, color: Colors.black54);
+    return Container(
+      width: size,
+      height: size,
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: it.logoUrl == null
+          ? fallback
+          : CachedNetworkImage(
+              imageUrl: it.logoUrl!,
+              fit: BoxFit.contain,
+              errorWidget: (_, _, _) => fallback,
+            ),
+    );
+  }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
