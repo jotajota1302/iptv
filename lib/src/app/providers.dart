@@ -8,6 +8,7 @@ import '../data/m3u_source.dart';
 import '../data/playlist_repository.dart';
 import '../data/series_grouper.dart';
 import '../domain/category.dart';
+import '../domain/content_type.dart';
 import '../domain/media_item.dart';
 import '../domain/series_group.dart';
 
@@ -31,6 +32,9 @@ final favoritesProvider = FutureProvider<List<MediaItem>>((ref) {
 });
 
 final searchQueryProvider = StateProvider<String>((_) => '');
+
+/// Filtro de tipo en la búsqueda (null = todos).
+final searchFilterProvider = StateProvider<ContentType?>((_) => null);
 
 final searchResultsProvider = FutureProvider<List<MediaItem>>((ref) {
   final q = ref.watch(searchQueryProvider);
@@ -115,20 +119,30 @@ final previewEpgProvider =
   return ref.watch(epgServiceProvider).shortEpg(streamUrl);
 });
 
-/// Categorías en directo para la pantalla de gestión (incluye ocultos).
-final manageCategoriesProvider = FutureProvider<List<Category>>((ref) {
-  return ref.watch(playlistRepositoryProvider).manageCategories();
+/// Clave para gestión por categoría: tipo de contenido + nombre de la categoría.
+typedef ManageKey = ({ContentType type, String group});
+
+/// Categorías de un tipo para la pantalla de gestión (incluye ocultos).
+final manageCategoriesByTypeProvider =
+    FutureProvider.family<List<Category>, ContentType>((ref, type) {
+  return ref.watch(playlistRepositoryProvider).manageCategoriesOf(type);
 });
 
-/// Todos los canales de una categoría (con su estado) para gestión.
-final manageLiveByCategoryProvider =
-    FutureProvider.family<List<MediaItem>, String>((ref, group) {
-  return ref.watch(playlistRepositoryProvider).manageLiveByCategory(group);
+/// Todos los items de una categoría (con su estado) para gestión, por tipo.
+final manageByCategoryProvider =
+    FutureProvider.family<List<MediaItem>, ManageKey>((ref, k) {
+  return ref.watch(playlistRepositoryProvider).manageByCategory(k.type, k.group);
 });
 
-/// Nº de canales ocultos/borrados por categoría (para señalizar en gestión).
-final hiddenCountsProvider = FutureProvider<Map<String, int>>((ref) {
-  return ref.watch(playlistRepositoryProvider).liveHiddenCounts();
+/// Nº de items ocultos/borrados por categoría de un tipo (señalizar gestión).
+final hiddenCountsByTypeProvider =
+    FutureProvider.family<Map<String, int>, ContentType>((ref, type) {
+  return ref.watch(playlistRepositoryProvider).hiddenCountsOf(type);
+});
+
+/// Películas/series empezadas y sin terminar ("Continuar viendo").
+final continueWatchingProvider = FutureProvider<List<MediaItem>>((ref) {
+  return ref.watch(playlistRepositoryProvider).continueWatching();
 });
 
 /// Vista en cuadrícula (iconos) vs lista en la pantalla de canales. Persistido.

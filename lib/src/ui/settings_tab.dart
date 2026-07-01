@@ -2,6 +2,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../app/providers.dart';
+import '../domain/content_type.dart';
 import '../domain/saved_playlist.dart';
 import 'management_screen.dart';
 
@@ -30,6 +31,9 @@ class _SettingsTabState extends ConsumerState<SettingsTab> {
       final n = await action();
       ref.read(loadStateProvider.notifier).state = 'Cargados $n elementos';
       ref.invalidate(liveCategoriesProvider);
+      ref.invalidate(movieCategoriesProvider);
+      ref.invalidate(seriesCategoriesProvider);
+      ref.invalidate(continueWatchingProvider);
       ref.invalidate(favoritesProvider);
     } catch (e) {
       ref.read(loadStateProvider.notifier).state = 'Error: $e';
@@ -140,12 +144,31 @@ class _SettingsTabState extends ConsumerState<SettingsTab> {
           ),
         ]),
         const SizedBox(height: 16),
+        const Text('Gestionar (ocultar / borrar)',
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+        const SizedBox(height: 8),
         OutlinedButton.icon(
           onPressed: () => Navigator.of(context).push(MaterialPageRoute(
-            builder: (_) => const ManagementScreen(),
+            builder: (_) => const ManagementScreen(type: ContentType.live),
           )),
-          icon: const Icon(Icons.tune),
-          label: const Text('Gestionar canales (ocultar / borrar)'),
+          icon: const Icon(Icons.live_tv),
+          label: const Text('Canales de TV'),
+        ),
+        const SizedBox(height: 8),
+        OutlinedButton.icon(
+          onPressed: () => Navigator.of(context).push(MaterialPageRoute(
+            builder: (_) => const ManagementScreen(type: ContentType.movie),
+          )),
+          icon: const Icon(Icons.movie),
+          label: const Text('Películas'),
+        ),
+        const SizedBox(height: 8),
+        OutlinedButton.icon(
+          onPressed: () => Navigator.of(context).push(MaterialPageRoute(
+            builder: (_) => const ManagementScreen(type: ContentType.series),
+          )),
+          icon: const Icon(Icons.theaters),
+          label: const Text('Series'),
         ),
         const SizedBox(height: 16),
         if (_loading) const LinearProgressIndicator(),

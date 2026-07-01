@@ -28,7 +28,7 @@ void main() {
     await tester.pumpWidget(ProviderScope(
       overrides: [
         playlistRepositoryProvider.overrideWithValue(repo),
-        manageLiveByCategoryProvider('Nacionales')
+        manageByCategoryProvider((type: ContentType.live, group: 'Nacionales'))
             .overrideWith((ref) async => [item]),
       ],
       child: const MaterialApp(

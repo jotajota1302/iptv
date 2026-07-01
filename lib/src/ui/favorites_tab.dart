@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../app/providers.dart';
-import 'player_screen.dart';
+import '../domain/content_type.dart';
+import 'play_helpers.dart';
 
 class FavoritesTab extends ConsumerWidget {
   const FavoritesTab({super.key});
@@ -19,19 +20,24 @@ class FavoritesTab extends ConsumerWidget {
           itemCount: items.length,
           itemBuilder: (_, i) {
             final it = items[i];
+            final icon = switch (it.type) {
+              ContentType.movie => Icons.movie,
+              ContentType.series => Icons.theaters,
+              _ => Icons.live_tv,
+            };
             return ListTile(
-              leading: const Icon(Icons.favorite),
+              leading: Icon(icon),
               title: Text(it.name),
+              subtitle: it.groupTitle != null ? Text(it.groupTitle!) : null,
               trailing: IconButton(
-                icon: const Icon(Icons.delete_outline),
+                icon: const Icon(Icons.favorite),
+                tooltip: 'Quitar de favoritos',
                 onPressed: () async {
                   await ref.read(playlistRepositoryProvider).toggleFavorite(it);
                   ref.invalidate(favoritesProvider);
                 },
               ),
-              onTap: () => Navigator.of(context).push(MaterialPageRoute(
-                builder: (_) => PlayerScreen(item: it),
-              )),
+              onTap: () => openPlayer(context, it),
             );
           },
         );
