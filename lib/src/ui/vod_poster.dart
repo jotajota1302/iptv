@@ -17,6 +17,9 @@ class VodPoster extends StatelessWidget {
   /// Si es false (por defecto), va debajo (cuadrículas).
   final bool titleOverlay;
 
+  /// Etiqueta para la animación Hero póster→ficha (opcional).
+  final String? heroTag;
+
   const VodPoster({
     super.key,
     required this.title,
@@ -27,6 +30,7 @@ class VodPoster extends StatelessWidget {
     this.onLongPress,
     this.favorite = false,
     this.titleOverlay = false,
+    this.heroTag,
   });
 
   @override
@@ -97,14 +101,18 @@ class VodPoster extends StatelessWidget {
       color: const Color(0xFF23252F),
       child: Icon(fallbackIcon, size: 38, color: Colors.white24),
     );
-    if (posterUrl == null) return fallback;
-    return CachedNetworkImage(
-      imageUrl: posterUrl!,
-      fit: BoxFit.cover,
-      fadeInDuration: const Duration(milliseconds: 250),
-      placeholder: (_, _) => Container(color: const Color(0xFF1E2029)),
-      errorWidget: (_, _, _) => fallback,
-    );
+    final img = posterUrl == null
+        ? fallback
+        : CachedNetworkImage(
+            imageUrl: posterUrl!,
+            fit: BoxFit.cover,
+            fadeInDuration: const Duration(milliseconds: 250),
+            placeholder: (_, _) => Container(color: const Color(0xFF1E2029)),
+            errorWidget: (_, _, _) => fallback,
+          );
+    return heroTag == null
+        ? img
+        : Hero(tag: heroTag!, child: Material(type: MaterialType.transparency, child: img));
   }
 
   Widget _scrim() => const DecoratedBox(

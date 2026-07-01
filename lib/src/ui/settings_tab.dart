@@ -290,6 +290,23 @@ class _SettingsTabState extends ConsumerState<SettingsTab> {
               'Opcional: exige PIN para volver a mostrar el contenido +18.'),
           onTap: _changePin,
         ),
+
+        const SizedBox(height: 24),
+        const Divider(),
+        const Text('Acerca de', style: TextStyle(fontSize: 20)),
+        const SizedBox(height: 8),
+        const ListTile(
+          contentPadding: EdgeInsets.zero,
+          leading: Icon(Icons.live_tv),
+          title: Text('IPTV Player'),
+          subtitle: Text('Versión 1.0.0 · Flutter + media_kit'),
+        ),
+        const ListTile(
+          contentPadding: EdgeInsets.zero,
+          leading: Icon(Icons.code),
+          title: Text('Código fuente'),
+          subtitle: SelectableText('github.com/jotajota1302/iptv'),
+        ),
       ],
     );
   }

@@ -26,7 +26,17 @@ ThemeData buildAppTheme() {
     splashFactory: InkSparkle.splashFactory,
   );
 
+  const zoom = ZoomPageTransitionsBuilder();
   return base.copyWith(
+    // Transiciones de página suaves en todas las plataformas (escritorio
+    // incluido, que por defecto no anima).
+    pageTransitionsTheme: const PageTransitionsTheme(builders: {
+      TargetPlatform.windows: zoom,
+      TargetPlatform.linux: zoom,
+      TargetPlatform.macOS: zoom,
+      TargetPlatform.android: zoom,
+      TargetPlatform.iOS: zoom,
+    }),
     appBarTheme: const AppBarTheme(
       backgroundColor: Colors.transparent,
       surfaceTintColor: Colors.transparent,

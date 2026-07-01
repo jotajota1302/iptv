@@ -122,6 +122,7 @@ class _MovieGridScreenState extends ConsumerState<MovieGridScreen> {
                     return VodPoster(
                       title: it.name,
                       posterUrl: it.logoUrl,
+                      heroTag: 'movie-${it.id}',
                       watchedFraction: it.watchedFraction.toDouble(),
                       favorite: it.isFavorite,
                       onTap: () async {

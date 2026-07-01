@@ -85,16 +85,19 @@ class MovieDetailScreen extends ConsumerWidget {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.end,
       children: [
-        ClipRRect(
-          borderRadius: BorderRadius.circular(12),
-          child: Container(
-            width: 110,
-            height: 165,
-            color: kSurfaceHigh,
-            child: item.logoUrl == null
-                ? const Icon(Icons.movie_outlined, size: 40)
-                : CachedNetworkImage(
-                    imageUrl: item.logoUrl!, fit: BoxFit.cover),
+        Hero(
+          tag: 'movie-${item.id}',
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(12),
+            child: Container(
+              width: 110,
+              height: 165,
+              color: kSurfaceHigh,
+              child: item.logoUrl == null
+                  ? const Icon(Icons.movie_outlined, size: 40)
+                  : CachedNetworkImage(
+                      imageUrl: item.logoUrl!, fit: BoxFit.cover),
+            ),
           ),
         ),
         const SizedBox(width: 14),
