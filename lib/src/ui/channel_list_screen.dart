@@ -49,10 +49,18 @@ class _ChannelListScreenState extends ConsumerState<ChannelListScreen> {
     await _previewCtrl!.setDeinterlace(ref.read(deinterlaceProvider));
   }
 
-  void _fullscreen(MediaItem it) {
-    Navigator.of(context).push(
+  /// Abre el canal en pantalla completa. Pausa el preview antes para evitar
+  /// audio doble (dos reproductores sonando a la vez) y lo reanuda al volver
+  /// si sigue siendo el canal seleccionado.
+  Future<void> _fullscreen(MediaItem it) async {
+    await _previewCtrl?.pause();
+    if (!mounted) return;
+    await Navigator.of(context).push(
       MaterialPageRoute(builder: (_) => PlayerScreen(item: it)),
     );
+    if (mounted && _selected?.id == it.id) {
+      await _previewCtrl?.play();
+    }
   }
 
   Future<void> _action(String action, MediaItem it) async {
@@ -190,9 +198,46 @@ class _ChannelListScreenState extends ConsumerState<ChannelListScreen> {
             ],
           ),
         ),
+        const Divider(height: 24),
+        Expanded(child: _epgSection(sel)),
       ],
     );
   }
+
+  /// Sección de programación (EPG) bajo el preview: programa actual y los
+  /// siguientes. Si no hay datos disponibles, muestra un aviso discreto.
+  Widget _epgSection(MediaItem sel) {
+    final async = ref.watch(previewEpgProvider(sel.streamUrl));
+    return async.when(
+      loading: () => const Center(child: CircularProgressIndicator()),
+      error: (_, _) => const _EpgEmpty(),
+      data: (entries) {
+        if (entries.isEmpty) return const _EpgEmpty();
+        return ListView.builder(
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          itemCount: entries.length,
+          itemBuilder: (_, i) {
+            final e = entries[i];
+            final now = i == 0;
+            return ListTile(
+              dense: true,
+              contentPadding: EdgeInsets.zero,
+              leading: Text(_hhmm(e.start),
+                  style: TextStyle(
+                      fontWeight: now ? FontWeight.bold : FontWeight.normal)),
+              title: Text(e.title,
+                  style: TextStyle(
+                      fontWeight: now ? FontWeight.bold : FontWeight.normal)),
+              subtitle: now ? const Text('Ahora') : null,
+            );
+          },
+        );
+      },
+    );
+  }
+
+  String _hhmm(DateTime d) =>
+      '${d.hour.toString().padLeft(2, '0')}:${d.minute.toString().padLeft(2, '0')}';
 
   Widget _buildList(BuildContext context, List<MediaItem> items, bool wide) {
     return ListView.builder(
@@ -206,6 +251,11 @@ class _ChannelListScreenState extends ConsumerState<ChannelListScreen> {
           trailing: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
+              IconButton(
+                icon: const Icon(Icons.fullscreen),
+                tooltip: 'Pantalla completa',
+                onPressed: () => _fullscreen(it),
+              ),
               IconButton(
                 icon: Icon(
                     it.isFavorite ? Icons.favorite : Icons.favorite_border),
@@ -260,14 +310,26 @@ class _ChannelListScreenState extends ConsumerState<ChannelListScreen> {
                   ),
                 ),
                 Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                   children: [
                     IconButton(
                       iconSize: 20,
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(),
+                      visualDensity: VisualDensity.compact,
                       icon: Icon(it.isFavorite
                           ? Icons.favorite
                           : Icons.favorite_border),
                       onPressed: () => _action('favorito', it),
+                    ),
+                    IconButton(
+                      iconSize: 20,
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(),
+                      visualDensity: VisualDensity.compact,
+                      icon: const Icon(Icons.fullscreen),
+                      tooltip: 'Pantalla completa',
+                      onPressed: () => _fullscreen(it),
                     ),
                     _menu(it),
                   ],
@@ -277,6 +339,21 @@ class _ChannelListScreenState extends ConsumerState<ChannelListScreen> {
           ),
         );
       },
+    );
+  }
+}
+
+/// Aviso cuando no hay guía de programación disponible para el canal.
+class _EpgEmpty extends StatelessWidget {
+  const _EpgEmpty();
+  @override
+  Widget build(BuildContext context) {
+    return const Center(
+      child: Padding(
+        padding: EdgeInsets.all(16),
+        child: Text('Sin guía de programación disponible',
+            textAlign: TextAlign.center, style: TextStyle(color: Colors.grey)),
+      ),
     );
   }
 }

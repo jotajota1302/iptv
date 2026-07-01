@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/legacy.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'playlists_controller.dart';
 import '../data/app_database.dart';
+import '../data/epg_service.dart';
 import '../data/m3u_source.dart';
 import '../data/playlist_repository.dart';
 import '../domain/category.dart';
@@ -77,6 +78,18 @@ void setDeinterlaceSetting(WidgetRef ref, bool value) {
 final liveByCategoryProvider =
     FutureProvider.family<List<MediaItem>, String>((ref, group) {
   return ref.watch(playlistRepositoryProvider).liveByCategory(group);
+});
+
+/// Servicio de guía de programación (EPG) via API Xtream.
+final epgServiceProvider = Provider<EpgService>((_) => EpgService());
+
+/// Programación corta (actual y siguientes) del canal cuyo streamUrl se pasa.
+/// Usa las credenciales de la lista activa. Best-effort: vacío si no disponible.
+final previewEpgProvider =
+    FutureProvider.family<List<EpgEntry>, String>((ref, streamUrl) async {
+  final active = ref.watch(playlistsProvider).active;
+  if (active == null) return const [];
+  return ref.watch(epgServiceProvider).shortEpg(active.url, streamUrl);
 });
 
 /// Categorías en directo para la pantalla de gestión (incluye ocultos).
