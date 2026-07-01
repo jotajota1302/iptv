@@ -14,7 +14,19 @@ class PlayerScreen extends ConsumerStatefulWidget {
   /// Si es true (VOD), reanuda desde la posición guardada y va guardando el
   /// progreso. En directo (false) no aplica.
   final bool resume;
-  const PlayerScreen({super.key, required this.item, this.resume = false});
+
+  /// Cola de reproducción (p. ej. episodios de una temporada) para auto‑pasar
+  /// al siguiente al terminar. Null = sin cola.
+  final List<MediaItem>? queue;
+  final int queueIndex;
+
+  const PlayerScreen({
+    super.key,
+    required this.item,
+    this.resume = false,
+    this.queue,
+    this.queueIndex = 0,
+  });
   @override
   ConsumerState<PlayerScreen> createState() => _PlayerScreenState();
 }
@@ -24,6 +36,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
   late final VideoController _video;
   final List<StreamSubscription> _subs = [];
   bool _seeked = false;
+  bool _advanced = false;
   bool _savedLoaded = false;
   int _savedPosition = 0;
   int _lastSaved = 0;
@@ -55,6 +68,12 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
         _subtitleTracks = t.subtitle;
       });
     }));
+    // Auto‑pasar al siguiente episodio al terminar (si hay cola).
+    if (_hasNext) {
+      _subs.add(_ctrl.player.stream.completed.listen((done) {
+        if (done) _playNext();
+      }));
+    }
     if (widget.resume) _setupResume();
     _ctrl.open(widget.item.streamUrl);
     // Config por tipo. bwdif requiere la libmpv completa (ver tool/patch_libmpv.sh).
@@ -115,6 +134,33 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
         );
   }
 
+  bool get _hasNext =>
+      widget.queue != null && widget.queueIndex + 1 < widget.queue!.length;
+
+  /// Pasa al siguiente elemento de la cola (episodio). Marca el actual como
+  /// visto y reemplaza la pantalla para reutilizar toda la lógica.
+  void _playNext() {
+    if (_advanced || !_hasNext) return;
+    _advanced = true;
+    final q = widget.queue!;
+    final next = widget.queueIndex + 1;
+    // Marca el episodio actual como terminado.
+    if (_duration.inSeconds > 0) {
+      ref.read(playlistRepositoryProvider).saveProgress(
+          widget.item.id, _duration.inSeconds,
+          duration: _duration.inSeconds);
+    }
+    if (!mounted) return;
+    Navigator.of(context).pushReplacement(MaterialPageRoute(
+      builder: (_) => PlayerScreen(
+        item: q[next],
+        resume: true,
+        queue: q,
+        queueIndex: next,
+      ),
+    ));
+  }
+
   String _audioLabel(AudioTrack t) {
     if (t.id == 'auto') return 'Automático';
     if (t.id == 'no') return 'Ninguno';
@@ -149,6 +195,13 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
 
   List<Widget> _trackActions() {
     final actions = <Widget>[];
+    if (_hasNext) {
+      actions.add(IconButton(
+        icon: const Icon(Icons.skip_next),
+        tooltip: 'Siguiente episodio',
+        onPressed: _playNext,
+      ));
+    }
     // Selección de audio (solo si hay más de una pista real).
     final audios = _audioTracks.where((t) => t.id != 'auto').toList();
     if (audios.length > 1) {

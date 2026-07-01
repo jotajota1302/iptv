@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../app/providers.dart';
 import '../domain/series_group.dart';
-import 'play_helpers.dart';
+import 'player_screen.dart';
 
 /// Detalle de una serie: una sección plegable (ExpansionTile) por temporada,
 /// con la lista de episodios. Tocar un episodio lo reproduce con reanudación;
@@ -78,9 +78,19 @@ class SeriesDetailScreen extends ConsumerWidget {
               for (final e in episodes)
                 ListTile(
                   leading: CircleAvatar(
-                    child: Text(e.episode > 0 ? '${e.episode}' : '•'),
+                    child: e.item.watchedFraction >= 0.9
+                        ? const Icon(Icons.check, size: 18)
+                        : Text(e.episode > 0 ? '${e.episode}' : '•'),
                   ),
                   title: Text(e.item.name),
+                  subtitle: e.item.watchedFraction > 0 &&
+                          e.item.watchedFraction < 0.9
+                      ? LinearProgressIndicator(
+                          value: e.item.watchedFraction.toDouble(),
+                          minHeight: 3,
+                          backgroundColor: Colors.white12,
+                        )
+                      : null,
                   trailing: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
@@ -99,7 +109,14 @@ class SeriesDetailScreen extends ConsumerWidget {
                       const Icon(Icons.play_arrow),
                     ],
                   ),
-                  onTap: () => openPlayer(context, e.item),
+                  onTap: () => Navigator.of(context).push(MaterialPageRoute(
+                    builder: (_) => PlayerScreen(
+                      item: e.item,
+                      resume: true,
+                      queue: [for (final x in episodes) x.item],
+                      queueIndex: episodes.indexOf(e),
+                    ),
+                  )),
                 ),
             ],
           );
