@@ -32,5 +32,13 @@ void main() {
     await tester.tap(find.text('Temporada 2'));
     await tester.pumpAndSettle();
     expect(find.text('1. Episodio 1'), findsOneWidget);
+
+    // Y se puede VOLVER a la temporada 1 (regresión: los chips quedaban
+    // parcialmente fuera de su zona de toque por un Transform.translate).
+    await tester.tap(find.text('Temporada 1'));
+    await tester.pumpAndSettle();
+    final chip1 = tester.widget<ChoiceChip>(
+        find.widgetWithText(ChoiceChip, 'Temporada 1'));
+    expect(chip1.selected, isTrue);
   });
 }

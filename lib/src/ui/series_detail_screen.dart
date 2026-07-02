@@ -68,11 +68,11 @@ class _SeriesDetailScreenState extends ConsumerState<SeriesDetailScreen> {
               stretchModes: const [StretchMode.zoomBackground],
             ),
           ),
+          // Sin Transform.translate: desplaza el dibujo pero no la zona de
+          // toque de los slivers, y dejaba chips/botones sin responder.
           SliverToBoxAdapter(
-            child: Transform.translate(
-              offset: const Offset(0, -44),
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(16, 0, 16, 0),
+            child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -104,32 +104,29 @@ class _SeriesDetailScreenState extends ConsumerState<SeriesDetailScreen> {
                       const SizedBox(height: 10),
                       _line('Reparto', info!.cast!),
                     ],
+                    const SizedBox(height: 6),
                   ],
                 ),
-              ),
             ),
           ),
           if (seasons.length > 1)
             SliverToBoxAdapter(
-              child: Transform.translate(
-                offset: const Offset(0, -30),
-                child: SizedBox(
-                  height: 48,
-                  child: ListView(
-                    scrollDirection: Axis.horizontal,
-                    padding: const EdgeInsets.symmetric(horizontal: 12),
-                    children: [
-                      for (final s in seasons)
-                        Padding(
-                          padding: const EdgeInsets.only(right: 8),
-                          child: ChoiceChip(
-                            label: Text(_seasonLabel(s)),
-                            selected: s == _season,
-                            onSelected: (_) => setState(() => _season = s),
-                          ),
+              child: SizedBox(
+                height: 48,
+                child: ListView(
+                  scrollDirection: Axis.horizontal,
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  children: [
+                    for (final s in seasons)
+                      Padding(
+                        padding: const EdgeInsets.only(right: 8),
+                        child: ChoiceChip(
+                          label: Text(_seasonLabel(s)),
+                          selected: s == _season,
+                          onSelected: (_) => setState(() => _season = s),
                         ),
-                    ],
-                  ),
+                      ),
+                  ],
                 ),
               ),
             ),
