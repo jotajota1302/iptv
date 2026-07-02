@@ -1,0 +1,92 @@
+# Compila un libmpv LGPL (sin componentes GPL) para Windows x64, apto para
+# distribución comercial de la app con enlazado dinámico:
+#  - FFmpeg SIN --enable-gpl (queda LGPL 2.1+; bwdif/yadif son LGPL)
+#  - mpv con -Dgpl=false -Dlibmpv=true
+# El artifact incluye libmpv-2.dll, sus DLLs dependientes (MinGW, licencias
+# permisivas/LGPL) y los textos de licencia para la pantalla de atribuciones.
+name: build-libmpv-lgpl
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/build-libmpv-lgpl.yml'
+
+jobs:
+  build:
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: msys2 {0}
+    steps:
+      - name: Preparar MSYS2/MINGW64
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: MINGW64
+          update: true
+          install: >-
+            git
+            make
+            diffutils
+            mingw-w64-x86_64-gcc
+            mingw-w64-x86_64-nasm
+            mingw-w64-x86_64-meson
+            mingw-w64-x86_64-ninja
+            mingw-w64-x86_64-pkgconf
+            mingw-w64-x86_64-libass
+            mingw-w64-x86_64-libplacebo
+            mingw-w64-x86_64-spirv-cross
+            mingw-w64-x86_64-shaderc
+            mingw-w64-x86_64-ntldd
+
+      - name: Compilar FFmpeg (LGPL, sin --enable-gpl)
+        run: |
+          git clone --depth 1 --branch n7.1 https://github.com/FFmpeg/FFmpeg.git ffmpeg
+          cd ffmpeg
+          ./configure --prefix=/mingw64/local \
+            --enable-shared --disable-static \
+            --disable-programs --disable-doc --disable-debug \
+            --enable-schannel
+          make -j$(nproc)
+          make install
+
+      - name: Compilar libmpv (LGPL, -Dgpl=false)
+        run: |
+          git clone --depth 1 --branch v0.39.0 https://github.com/mpv-player/mpv.git mpv
+          cd mpv
+          export PKG_CONFIG_PATH=/mingw64/local/lib/pkgconfig:$PKG_CONFIG_PATH
+          meson setup build \
+            -Dgpl=false \
+            -Dlibmpv=true \
+            -Dcplayer=false \
+            -Dlua=disabled \
+            -Djavascript=disabled \
+            --buildtype=release
+          meson compile -C build
+          ls -la build/*.dll
+
+      - name: Empaquetar DLL + dependencias + licencias
+        run: |
+          mkdir -p dist
+          cp mpv/build/libmpv-2.dll dist/
+          # DLLs de las que depende (MinGW/FFmpeg propios): junto al exe de la app.
+          export PATH=/mingw64/local/bin:$PATH
+          ntldd -R dist/libmpv-2.dll | grep -iv 'windows\|not found' | awk '{print $3}' | sort -u | while read f; do
+            case "$f" in
+              /mingw64/*|/*/local/*) cp -v "$f" dist/ || true ;;
+            esac
+          done
+          # Textos de licencia para la pantalla de atribuciones.
+          mkdir -p dist/licenses
+          cp mpv/LICENSE.LGPL dist/licenses/mpv-LICENSE.LGPL || true
+          cp ffmpeg/COPYING.LGPLv2.1 dist/licenses/ffmpeg-COPYING.LGPLv2.1 || true
+          cp ffmpeg/COPYING.LGPLv3 dist/licenses/ffmpeg-COPYING.LGPLv3 || true
+          sha256sum dist/*.dll > dist/SHA256SUMS.txt
+          cat dist/SHA256SUMS.txt
+
+      - name: Subir artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: libmpv-lgpl-windows-x64
+          path: dist/
+          if-no-files-found: error
