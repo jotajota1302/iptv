@@ -91,14 +91,15 @@ class _ChannelListScreenState extends ConsumerState<ChannelListScreen> {
 
   Widget _logo(MediaItem it, {double size = 48}) {
     final fallback =
-        Icon(Icons.live_tv, size: size * 0.55, color: Colors.black54);
+        Icon(Icons.live_tv, size: size * 0.5, color: Colors.white24);
     return Container(
       width: size,
       height: size,
-      padding: const EdgeInsets.all(4),
+      padding: const EdgeInsets.all(6),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(8),
+        color: const Color(0xFF20222B),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: Colors.white10),
       ),
       child: it.logoUrl == null
           ? fallback
@@ -311,14 +312,21 @@ class _ChannelListScreenState extends ConsumerState<ChannelListScreen> {
                     child: Center(child: _logo(it, size: 64)),
                   ),
                 ),
+                // Altura fija (2 líneas) para que el logo no se desplace según
+                // la longitud del nombre.
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 6),
-                  child: Text(
-                    it.name,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(fontSize: 12),
+                  child: SizedBox(
+                    height: 34,
+                    child: Center(
+                      child: Text(
+                        it.name,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(fontSize: 12.5, height: 1.15),
+                      ),
+                    ),
                   ),
                 ),
                 Row(

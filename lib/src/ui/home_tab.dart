@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../app/providers.dart';
 import '../app/theme.dart';
+import '../data/vod_info_service.dart';
 import '../domain/content_type.dart';
 import '../domain/media_item.dart';
 import '../domain/series_group.dart';
@@ -272,19 +273,22 @@ class _HeroArrow extends StatelessWidget {
   }
 }
 
-class _HeroCard extends StatelessWidget {
+class _HeroCard extends ConsumerWidget {
   final MediaItem movie;
   const _HeroCard({required this.movie});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final info = ref.watch(vodInfoProvider(movie.streamUrl)).value;
     return ClipRRect(
       borderRadius: BorderRadius.circular(20),
       child: Stack(
         fit: StackFit.expand,
         children: [
-          // Fondo desenfocado a partir del póster (efecto cine).
-          if (movie.logoUrl != null)
+          // Fondo: backdrop de la ficha si existe, o el póster desenfocado.
+          if (info?.backdrop != null)
+            CachedNetworkImage(imageUrl: info!.backdrop!, fit: BoxFit.cover)
+          else if (movie.logoUrl != null)
             ImageFiltered(
               imageFilter: ImageFilter.blur(sigmaX: 24, sigmaY: 24),
               child: CachedNetworkImage(
@@ -297,14 +301,14 @@ class _HeroCard extends StatelessWidget {
               gradient: LinearGradient(
                 begin: Alignment.topRight,
                 end: Alignment.bottomLeft,
-                colors: [Color(0x66000000), Color(0xF2000000)],
+                colors: [Color(0x66000000), Color(0xF5000000)],
               ),
             ),
           ),
           Padding(
             padding: const EdgeInsets.all(16),
             child: Row(
-              crossAxisAlignment: CrossAxisAlignment.end,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 ClipRRect(
                   borderRadius: BorderRadius.circular(12),
@@ -320,45 +324,7 @@ class _HeroCard extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(width: 16),
-                Expanded(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.end,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text('DESTACADA',
-                          style: TextStyle(
-                              color: kAccent,
-                              fontSize: 11,
-                              fontWeight: FontWeight.w800,
-                              letterSpacing: 1.2)),
-                      const SizedBox(height: 6),
-                      Text(movie.name,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                              fontSize: 20, fontWeight: FontWeight.w800)),
-                      const SizedBox(height: 12),
-                      Row(
-                        children: [
-                          FilledButton.icon(
-                            onPressed: () => openPlayer(context, movie),
-                            icon: const Icon(Icons.play_arrow, size: 20),
-                            label: const Text('Ver'),
-                          ),
-                          const SizedBox(width: 8),
-                          IconButton.filledTonal(
-                            onPressed: () => Navigator.of(context).push(
-                              MaterialPageRoute(
-                                  builder: (_) =>
-                                      MovieDetailScreen(item: movie)),
-                            ),
-                            icon: const Icon(Icons.info_outline),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
+                Expanded(child: _details(context, info)),
               ],
             ),
           ),
@@ -366,6 +332,82 @@ class _HeroCard extends StatelessWidget {
       ),
     );
   }
+
+  Widget _details(BuildContext context, VodInfo? info) {
+    final meta = <String>[
+      if (info?.year != null) info!.year!,
+      if (info?.genre != null) info!.genre!,
+      if (info?.rating != null) '⭐ ${info!.rating}',
+    ];
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text('DESTACADA',
+            style: TextStyle(
+                color: kAccent,
+                fontSize: 11,
+                fontWeight: FontWeight.w800,
+                letterSpacing: 1.2)),
+        const SizedBox(height: 4),
+        Text(movie.name,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(fontSize: 19, fontWeight: FontWeight.w800)),
+        if (meta.isNotEmpty) ...[
+          const SizedBox(height: 6),
+          Wrap(
+            spacing: 6,
+            runSpacing: 4,
+            children: [for (final m in meta) _pill(m)],
+          ),
+        ],
+        const SizedBox(height: 8),
+        Expanded(
+          child: (info?.plot ?? '').isEmpty
+              ? const SizedBox.shrink()
+              : Text(info!.plot!,
+                  maxLines: 4,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                      fontSize: 12.5, height: 1.35, color: Colors.white70)),
+        ),
+        if (info?.cast != null)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 6),
+            child: Text('Reparto: ${info!.cast!}',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(fontSize: 11, color: Colors.white54)),
+          ),
+        Row(
+          children: [
+            FilledButton.icon(
+              onPressed: () => openPlayer(context, movie),
+              icon: const Icon(Icons.play_arrow, size: 20),
+              label: const Text('Ver'),
+            ),
+            const SizedBox(width: 8),
+            IconButton.filledTonal(
+              onPressed: () => Navigator.of(context).push(
+                MaterialPageRoute(
+                    builder: (_) => MovieDetailScreen(item: movie)),
+              ),
+              icon: const Icon(Icons.info_outline),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _pill(String text) => Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: 0.14),
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Text(text, style: const TextStyle(fontSize: 11)),
+      );
 }
 
 class _EmptyHome extends StatelessWidget {

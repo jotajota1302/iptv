@@ -54,7 +54,7 @@ class VodPoster extends StatelessWidget {
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
                 style: const TextStyle(
-                    fontSize: 12,
+                    fontSize: 13.5,
                     fontWeight: FontWeight.w600,
                     shadows: [Shadow(blurRadius: 4, color: Colors.black)]),
               ),
@@ -88,7 +88,7 @@ class VodPoster extends StatelessWidget {
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
               textAlign: TextAlign.center,
-              style: const TextStyle(fontSize: 11, height: 1.15),
+              style: const TextStyle(fontSize: 13, height: 1.2),
             ),
           ),
         ],
