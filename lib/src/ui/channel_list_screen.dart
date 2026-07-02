@@ -10,6 +10,7 @@ import '../domain/media_item.dart';
 import '../domain/sort_mode.dart';
 import '../player/media_kit_player_controller.dart';
 import 'channel_guide_screen.dart';
+import 'epg_grid_screen.dart';
 import 'player_screen.dart';
 import 'sort_menu.dart';
 
@@ -152,6 +153,14 @@ class _ChannelListScreenState extends ConsumerState<ChannelListScreen> {
       appBar: AppBar(
         title: Text(widget.category.name),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.calendar_view_week),
+            tooltip: 'Guía de programación (rejilla)',
+            onPressed: () => Navigator.of(context).push(MaterialPageRoute(
+              builder: (_) =>
+                  EpgGridScreen(categoryName: widget.category.name),
+            )),
+          ),
           const SortMenu(),
           if (grid)
             PopupMenuButton<int>(

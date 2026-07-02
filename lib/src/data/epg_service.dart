@@ -9,11 +9,16 @@ class EpgEntry {
   final DateTime start;
   final DateTime end;
   final bool hasArchive;
+
+  /// Sinopsis del programa (solo la aporta el EPG XMLTV completo).
+  final String? description;
+
   const EpgEntry({
     required this.title,
     required this.start,
     required this.end,
     this.hasArchive = false,
+    this.description,
   });
 
   int get durationMinutes {

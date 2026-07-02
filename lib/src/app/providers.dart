@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/legacy.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'playlists_controller.dart';
+import 'reminders_controller.dart';
 import '../data/app_database.dart';
 import '../data/epg_service.dart';
 import '../data/m3u_source.dart';
@@ -10,6 +11,8 @@ import '../data/account_service.dart';
 import '../data/series_grouper.dart';
 import '../data/series_info_service.dart';
 import '../data/vod_info_service.dart';
+import '../data/xmltv_service.dart';
+import '../domain/reminder.dart';
 import '../domain/adult_filter.dart';
 import '../domain/category.dart';
 import '../domain/channel_dedupe.dart';
@@ -276,6 +279,23 @@ final channelGuideProvider =
     FutureProvider.family<List<EpgEntry>, String>((ref, streamUrl) {
   return ref.watch(epgServiceProvider).fullEpg(streamUrl);
 });
+
+/// Servicio del EPG completo XMLTV (una descarga por sesión, cacheada).
+final xmltvServiceProvider = Provider<XmltvService>((_) => XmltvService());
+
+/// Guía XMLTV completa del servidor de la lista activa. Best-effort: null si
+/// el servidor no la expone o no hay lista.
+final xmltvGuideProvider = FutureProvider<XmltvGuide?>((ref) async {
+  final active = ref.watch(playlistsProvider).active?.url ??
+      await ref.watch(loadedListUrlProvider.future);
+  if (active == null) return null;
+  return ref.watch(xmltvServiceProvider).fetchFromListUrl(active);
+});
+
+/// Recordatorios de programas (persistidos).
+final remindersProvider =
+    StateNotifierProvider<RemindersNotifier, List<Reminder>>(
+        (ref) => RemindersNotifier(ref.watch(sharedPrefsProvider)));
 
 /// Qué emiten ahora mismo los canales favoritos (máx. 12), para el rail
 /// "Ahora en tus canales" del Inicio. Best-effort: canales sin EPG se omiten.

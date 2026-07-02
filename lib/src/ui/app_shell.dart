@@ -1,9 +1,11 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../app/providers.dart';
 import '../domain/content_type.dart';
 import '../domain/media_item.dart';
+import '../domain/reminder.dart';
 import 'home_tab.dart';
 import 'player_screen.dart';
 import 'live_tab.dart';
@@ -37,13 +39,70 @@ class _AppShellState extends ConsumerState<AppShell> {
     (icon: Icons.settings_outlined, sel: Icons.settings, label: 'Ajustes'),
   ];
 
+  Timer? _reminderTimer;
+
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.read(remindersProvider.notifier).prunePast();
       _startupChannel();
       _autoRefresh();
     });
+    _reminderTimer = Timer.periodic(
+        const Duration(seconds: 20), (_) => _checkReminders());
+  }
+
+  @override
+  void dispose() {
+    _reminderTimer?.cancel();
+    super.dispose();
+  }
+
+  /// Dispara los recordatorios cuyo programa empieza ya (o en <1 min).
+  void _checkReminders() {
+    final now = DateTime.now();
+    for (final r in ref.read(remindersProvider)) {
+      if (r.start.difference(now).inSeconds > 60) continue;
+      ref.read(remindersProvider.notifier).remove(r.id);
+      // Si el aviso quedó muy atrás (app cerrada), no molestar.
+      if (now.difference(r.start) < const Duration(minutes: 10)) {
+        _fireReminder(r);
+      }
+    }
+  }
+
+  void _fireReminder(Reminder r) {
+    if (!mounted) return;
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('⏰ ${r.title}'),
+        content: Text('Empieza ahora en ${r.channelName}'),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Cerrar')),
+          FilledButton.icon(
+            icon: const Icon(Icons.play_arrow),
+            label: const Text('Ver ahora'),
+            onPressed: () {
+              Navigator.pop(ctx);
+              Navigator.of(context).push(MaterialPageRoute(
+                builder: (_) => PlayerScreen(
+                  item: MediaItem(
+                    id: 'reminder:${r.channelUrl}',
+                    name: r.channelName,
+                    streamUrl: r.channelUrl,
+                    type: ContentType.live,
+                  ),
+                ),
+              ));
+            },
+          ),
+        ],
+      ),
+    );
   }
 
   /// Si está activado "arrancar en el último canal", lo abre directamente
