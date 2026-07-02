@@ -380,6 +380,11 @@ class _Backdrop extends StatelessWidget {
   final SeriesApiInfo? info;
   const _Backdrop({required this.series, required this.info});
 
+  Widget _blurredPoster(String poster) => ImageFiltered(
+        imageFilter: ImageFilter.blur(sigmaX: 30, sigmaY: 30),
+        child: CachedNetworkImage(imageUrl: poster, fit: BoxFit.cover),
+      );
+
   @override
   Widget build(BuildContext context) {
     final wide = info?.backdrop;
@@ -388,12 +393,16 @@ class _Backdrop extends StatelessWidget {
       fit: StackFit.expand,
       children: [
         if (wide != null)
-          CachedNetworkImage(imageUrl: wide, fit: BoxFit.cover)
-        else if (poster != null)
-          ImageFiltered(
-            imageFilter: ImageFilter.blur(sigmaX: 30, sigmaY: 30),
-            child: CachedNetworkImage(imageUrl: poster, fit: BoxFit.cover),
+          CachedNetworkImage(
+            imageUrl: wide,
+            fit: BoxFit.cover,
+            // Si el backdrop del proveedor falla, cae al póster difuminado.
+            errorWidget: (_, _, _) => poster != null
+                ? _blurredPoster(poster)
+                : Container(color: kSurfaceHigh),
           )
+        else if (poster != null)
+          _blurredPoster(poster)
         else
           Container(color: kSurfaceHigh),
         const DecoratedBox(

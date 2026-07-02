@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:dio/dio.dart';
+import 'vod_info_service.dart' show normalizeBackdrop;
 
 /// Entrada del catálogo de series de la API Xtream (`get_series`).
 class SeriesCatalogEntry {
@@ -203,7 +204,7 @@ SeriesApiInfo? parseSeriesInfo(Map<String, dynamic> json) {
     releaseDate: _str(i, 'releaseDate') ?? _str(i, 'release_date'),
     rating: _str(i, 'rating'),
     cover: _str(i, 'cover'),
-    backdrop: _str(i, 'backdrop_path'),
+    backdrop: normalizeBackdrop(_str(i, 'backdrop_path')),
     youtubeTrailer: _str(i, 'youtube_trailer'),
     episodesById: episodes,
   );

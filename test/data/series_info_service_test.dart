@@ -155,6 +155,16 @@ void main() {
     });
   });
 
+  group('backdrop normalizado en la ficha de serie', () {
+    test('ruta relativa TMDB → URL completa', () {
+      final info = parseSeriesInfo({
+        'info': {'backdrop_path': '/abc.jpg'},
+        'episodes': <String, dynamic>{},
+      })!;
+      expect(info.backdrop, 'https://image.tmdb.org/t/p/w1280/abc.jpg');
+    });
+  });
+
   group('formatEpisodeDuration', () {
     test('convierte HH:MM:SS a minutos legibles', () {
       expect(formatEpisodeDuration('00:58:00'), '58 min');

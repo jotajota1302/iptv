@@ -64,6 +64,17 @@ Uri? buildVodInfoUrl(String streamUrl) {
   );
 }
 
+/// Normaliza la imagen de fondo que devuelve el proveedor: muchos paneles
+/// mandan la ruta relativa de TMDB ("/abc.jpg") en vez de una URL completa,
+/// y entonces no se veía nada. Devuelve null si no hay nada usable.
+String? normalizeBackdrop(String? raw) {
+  final v = raw?.trim() ?? '';
+  if (v.isEmpty) return null;
+  if (v.startsWith('http://') || v.startsWith('https://')) return v;
+  if (v.startsWith('/')) return 'https://image.tmdb.org/t/p/w1280$v';
+  return null;
+}
+
 /// Parsea la respuesta de `get_vod_info` (campo `info`).
 VodInfo? parseVodInfo(Map<String, dynamic> json) {
   final info = json['info'];
@@ -84,7 +95,7 @@ VodInfo? parseVodInfo(Map<String, dynamic> json) {
     rating: str('rating'),
     durationText: str('duration'),
     cover: str('movie_image') ?? str('cover_big') ?? str('cover'),
-    backdrop: str('backdrop_path'),
+    backdrop: normalizeBackdrop(str('backdrop_path')),
     youtubeTrailer: str('youtube_trailer'),
   );
 }
