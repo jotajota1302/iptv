@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'src/app/brand.dart';
 import 'src/app/desktop_window.dart';
 import 'src/app/providers.dart';
 import 'src/app/theme.dart';
@@ -28,13 +29,15 @@ Future<void> main(List<String> args) async {
   MediaKit.ensureInitialized();
   await initDesktopWindow();
   final prefs = await SharedPreferences.getInstance();
-  // Color de acento elegido, antes de construir el tema.
-  kAccent = kAccentChoices[(prefs.getInt('accent_color') ?? 0)
-          .clamp(0, kAccentChoices.length - 1)]
-      .$2;
+  // Color de acento: preferencia del usuario > acento de la marca > violeta.
+  final accentPref = prefs.getInt('accent_color');
+  kAccent = accentPref != null
+      ? kAccentChoices[accentPref.clamp(0, kAccentChoices.length - 1)].$2
+      : (Brand.accent ?? kAccent);
   // Modo visor: lanzado con `--play <url>` desde la ventana principal, esta
   // instancia es solo una ventana de reproducción independiente.
   final viewer = parseViewerArgs(args);
+  if (viewer == null) setWindowTitle(Brand.name);
   runApp(ProviderScope(
     overrides: [sharedPrefsProvider.overrideWithValue(prefs)],
     child: viewer == null ? const IptvApp() : ViewerApp(args: viewer),
@@ -65,7 +68,7 @@ class IptvApp extends ConsumerWidget {
     // Al cambiar el acento en Ajustes se reconstruye el tema entero.
     ref.watch(accentIndexProvider);
     return MaterialApp(
-      title: 'IPTV Player',
+      title: Brand.name,
       debugShowCheckedModeBanner: false,
       theme: buildAppTheme(),
       scrollBehavior: AppScrollBehavior(),

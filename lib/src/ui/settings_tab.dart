@@ -3,9 +3,11 @@ import 'dart:io';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../app/brand.dart';
 import '../app/providers.dart';
 import '../app/theme.dart';
 import '../data/backup_service.dart';
+import '../domain/xtream_login.dart';
 import '../domain/content_type.dart';
 import '../domain/lang_match.dart';
 import '../domain/saved_playlist.dart';
@@ -20,13 +22,42 @@ class SettingsTab extends ConsumerStatefulWidget {
 class _SettingsTabState extends ConsumerState<SettingsTab> {
   final _urlCtrl = TextEditingController();
   final _nameCtrl = TextEditingController();
+  final _userCtrl = TextEditingController();
+  final _passCtrl = TextEditingController();
   bool _loading = false;
 
   @override
   void dispose() {
     _urlCtrl.dispose();
     _nameCtrl.dispose();
+    _userCtrl.dispose();
+    _passCtrl.dispose();
     super.dispose();
+  }
+
+  /// Modo proveedor (white-label): inicia sesión con usuario/contraseña
+  /// contra el servidor fijo de la marca; la URL nunca se muestra.
+  Future<void> _login() async {
+    final user = _userCtrl.text.trim();
+    final pass = _passCtrl.text;
+    if (user.isEmpty || pass.isEmpty) return;
+    final url = buildXtreamListUrl(Brand.server, user, pass);
+    final playlists = ref.read(playlistsProvider).playlists;
+    final existing = playlists.where((p) => p.name == Brand.name).toList();
+    if (existing.isNotEmpty) {
+      ref
+          .read(playlistsProvider.notifier)
+          .update(existing.first.id, url: url);
+      ref.read(playlistsProvider.notifier).setActive(existing.first.id);
+    } else {
+      ref.read(playlistsProvider.notifier).add(SavedPlaylist(
+            id: DateTime.now().microsecondsSinceEpoch.toString(),
+            name: Brand.name,
+            url: url,
+          ));
+    }
+    _passCtrl.clear();
+    await _run(() => ref.read(playlistRepositoryProvider).loadFromUrl(url));
   }
 
   Future<void> _run(Future<int> Function() action) async {
@@ -354,8 +385,11 @@ class _SettingsTabState extends ConsumerState<SettingsTab> {
                         : null,
                   ),
                   title: Text(pl.name),
-                  subtitle: Text(pl.url,
-                      maxLines: 1, overflow: TextOverflow.ellipsis),
+                  // En modo proveedor la URL (con credenciales) no se enseña.
+                  subtitle: Brand.isWhiteLabel
+                      ? null
+                      : Text(pl.url,
+                          maxLines: 1, overflow: TextOverflow.ellipsis),
                   trailing: PopupMenuButton<String>(
                     enabled: !_loading,
                     onSelected: (a) {
@@ -406,43 +440,77 @@ class _SettingsTabState extends ConsumerState<SettingsTab> {
         const SizedBox(height: 20),
         const Divider(),
 
-        // --- Añadir lista ---
-        const Text('Añadir lista M3U', style: TextStyle(fontSize: 20)),
-        const SizedBox(height: 12),
-        TextField(
-          controller: _nameCtrl,
-          decoration: const InputDecoration(
-            labelText: 'Nombre (opcional)',
-            border: OutlineInputBorder(),
+        // --- Añadir lista (marca propia) o login (modo proveedor) ---
+        if (Brand.isWhiteLabel) ...[
+          const Text('Iniciar sesión', style: TextStyle(fontSize: 20)),
+          const SizedBox(height: 4),
+          const Text('Introduce las credenciales de tu suscripción.',
+              style: TextStyle(color: Colors.white54, fontSize: 13)),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _userCtrl,
+            decoration: const InputDecoration(
+              labelText: 'Usuario',
+              prefixIcon: Icon(Icons.person_outline),
+              border: OutlineInputBorder(),
+            ),
           ),
-        ),
-        const SizedBox(height: 12),
-        TextField(
-          controller: _urlCtrl,
-          decoration: const InputDecoration(
-            labelText: 'URL de la lista',
-            border: OutlineInputBorder(),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _passCtrl,
+            obscureText: true,
+            decoration: const InputDecoration(
+              labelText: 'Contraseña',
+              prefixIcon: Icon(Icons.lock_outline),
+              border: OutlineInputBorder(),
+            ),
           ),
-        ),
-        const SizedBox(height: 12),
-        Row(children: [
-          FilledButton(
-            onPressed: _loading ? null : _addAndLoad,
-            child: const Text('Añadir y cargar'),
+          const SizedBox(height: 12),
+          FilledButton.icon(
+            onPressed: _loading ? null : _login,
+            icon: const Icon(Icons.login),
+            label: const Text('Entrar'),
           ),
-          const SizedBox(width: 12),
-          OutlinedButton(
-            onPressed: _loading
-                ? null
-                : () async {
-                    final res = await FilePicker.platform
-                        .pickFiles(type: FileType.any, withData: false);
-                    final path = res?.files.single.path;
-                    if (path != null) await _run(() => repo.loadFromFile(path));
-                  },
-            child: const Text('Elegir archivo'),
+        ] else ...[
+          const Text('Añadir lista M3U', style: TextStyle(fontSize: 20)),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _nameCtrl,
+            decoration: const InputDecoration(
+              labelText: 'Nombre (opcional)',
+              border: OutlineInputBorder(),
+            ),
           ),
-        ]),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _urlCtrl,
+            decoration: const InputDecoration(
+              labelText: 'URL de la lista',
+              border: OutlineInputBorder(),
+            ),
+          ),
+          const SizedBox(height: 12),
+          Row(children: [
+            FilledButton(
+              onPressed: _loading ? null : _addAndLoad,
+              child: const Text('Añadir y cargar'),
+            ),
+            const SizedBox(width: 12),
+            OutlinedButton(
+              onPressed: _loading
+                  ? null
+                  : () async {
+                      final res = await FilePicker.platform
+                          .pickFiles(type: FileType.any, withData: false);
+                      final path = res?.files.single.path;
+                      if (path != null) {
+                        await _run(() => repo.loadFromFile(path));
+                      }
+                    },
+              child: const Text('Elegir archivo'),
+            ),
+          ]),
+        ],
         const SizedBox(height: 16),
         const Text('Gestionar (ocultar / borrar)',
             style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
@@ -628,15 +696,16 @@ class _SettingsTabState extends ConsumerState<SettingsTab> {
         const ListTile(
           contentPadding: EdgeInsets.zero,
           leading: Icon(Icons.live_tv),
-          title: Text('IPTV Player'),
+          title: Text(Brand.name),
           subtitle: Text('Versión 1.0.0 · Flutter + media_kit'),
         ),
-        const ListTile(
-          contentPadding: EdgeInsets.zero,
-          leading: Icon(Icons.code),
-          title: Text('Código fuente'),
-          subtitle: SelectableText('github.com/jotajota1302/iptv'),
-        ),
+        if (!Brand.isWhiteLabel)
+          const ListTile(
+            contentPadding: EdgeInsets.zero,
+            leading: Icon(Icons.code),
+            title: Text('Código fuente'),
+            subtitle: SelectableText('github.com/jotajota1302/iptv'),
+          ),
       ],
     );
   }

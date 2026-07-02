@@ -19,3 +19,12 @@ Future<void> setWindowFullScreen(bool value) async {
     await windowManager.setFullScreen(value);
   } catch (_) {}
 }
+
+/// Cambia el título de la ventana (marca white-label). No-op fuera de
+/// escritorio.
+Future<void> setWindowTitle(String title) async {
+  if (!isDesktopWindow) return;
+  try {
+    await windowManager.setTitle(title);
+  } catch (_) {}
+}
