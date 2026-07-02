@@ -41,5 +41,14 @@ flutter build apk --release \
 
 Para distribución comercial cerrada, la app debe empaquetarse con el
 **libmpv LGPL** generado por el workflow `build-libmpv-lgpl` (artifact
-`libmpv-lgpl-windows-x64`), no con el build GPL completo de desarrollo.
-Incluye los textos de licencia del artifact (`licenses/`) junto a la app.
+`libmpv-lgpl-windows-x64`), no con el build GPL completo de desarrollo:
+
+```bash
+flutter build windows --release [--dart-define=...]
+bash tool/use_libmpv_lgpl.sh   # sustituye libmpv por el paquete LGPL
+```
+
+El script verifica el SHA256 de la DLL y copia también `licenses/` (textos
+LGPL de mpv y FFmpeg), que deben distribuirse junto a la app. Verificado:
+reproduce HLS con decodificación activa (mpv 0.39 + FFmpeg n7.1; bwdif/yadif
+son LGPL, así que el desentrelazado se conserva).
