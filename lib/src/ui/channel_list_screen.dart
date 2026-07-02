@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -5,11 +6,14 @@ import 'package:media_kit_video/media_kit_video.dart';
 import '../app/external_viewer.dart';
 import '../app/providers.dart';
 import '../app/theme.dart';
+import '../data/epg_service.dart';
+import '../data/xmltv_service.dart';
 import '../domain/category.dart';
 import '../domain/media_item.dart';
 import '../domain/sort_mode.dart';
 import '../player/media_kit_player_controller.dart';
 import 'channel_guide_screen.dart';
+import 'channel_reorder_screen.dart';
 import 'epg_grid_screen.dart';
 import 'player_screen.dart';
 import 'sort_menu.dart';
@@ -37,6 +41,11 @@ class _ChannelListScreenState extends ConsumerState<ChannelListScreen> {
   /// que se pasa al reproductor a pantalla completa.
   List<MediaItem> _visibleItems = const [];
 
+  /// Guía XMLTV (si el servidor la da) para pintar el programa en emisión
+  /// con su hora en cada canal. Se refresca cada minuto.
+  XmltvGuide? _guide;
+  Timer? _epgTick;
+
   @override
   void initState() {
     super.initState();
@@ -44,13 +53,34 @@ class _ChannelListScreenState extends ConsumerState<ChannelListScreen> {
       final show = _scroll.offset > 600;
       if (show != _showToTop) setState(() => _showToTop = show);
     });
+    _epgTick = Timer.periodic(
+        const Duration(seconds: 60), (_) => mounted ? setState(() {}) : null);
   }
 
   @override
   void dispose() {
+    _epgTick?.cancel();
     _scroll.dispose();
     _previewCtrl?.dispose();
     super.dispose();
+  }
+
+  /// Programa en emisión de un canal según la guía XMLTV (lista ordenada).
+  EpgEntry? _nowFor(MediaItem it) {
+    final guide = _guide;
+    if (guide == null) return null;
+    final now = DateTime.now();
+    for (final e in guide.forChannel(it.tvgId, it.name)) {
+      if (!now.isBefore(e.start) && now.isBefore(e.end)) return e;
+      if (e.start.isAfter(now)) break;
+    }
+    return null;
+  }
+
+  double _epgProgress(EpgEntry e) {
+    final now = DateTime.now();
+    final len = e.end.difference(e.start).inSeconds.clamp(1, 1 << 31);
+    return (now.difference(e.start).inSeconds / len).clamp(0.0, 1.0);
   }
 
   void _ensurePreview() {
@@ -150,6 +180,9 @@ class _ChannelListScreenState extends ConsumerState<ChannelListScreen> {
     final async = ref.watch(liveByCategoryProvider(widget.category.name));
     final grid = ref.watch(channelGridProvider);
     final sort = ref.watch(sortModeProvider);
+    final customOrder =
+        ref.watch(channelOrderProvider)[widget.category.name];
+    _guide = ref.watch(xmltvGuideProvider).value;
     return Scaffold(
       appBar: AppBar(
         title: Text(widget.category.name),
@@ -162,7 +195,17 @@ class _ChannelListScreenState extends ConsumerState<ChannelListScreen> {
                   EpgGridScreen(categoryName: widget.category.name),
             )),
           ),
-          const SortMenu(),
+          IconButton(
+            icon: const Icon(Icons.swap_vert),
+            tooltip: 'Ordenar canales a mano (arrastrar)',
+            onPressed: () => Navigator.of(context).push(MaterialPageRoute(
+              builder: (_) => ChannelReorderScreen(
+                category: widget.category.name,
+                items: _visibleItems,
+              ),
+            )),
+          ),
+          const SortMenu(showCustom: true),
           if (grid)
             PopupMenuButton<int>(
               icon: const Icon(Icons.photo_size_select_large),
@@ -196,7 +239,7 @@ class _ChannelListScreenState extends ConsumerState<ChannelListScreen> {
         error: (e, _) => Center(child: Text('Error: $e')),
         data: (all) => LayoutBuilder(
           builder: (context, constraints) {
-            final items = sortItems(all, sort);
+            final items = sortItems(all, sort, customOrder: customOrder);
             _visibleItems = items;
             final wide = constraints.maxWidth >= _kPreviewBreakpoint;
             final content = grid
@@ -357,9 +400,10 @@ class _ChannelListScreenState extends ConsumerState<ChannelListScreen> {
       controller: _scroll,
       itemCount: items.length,
       maxTileWidth: 560,
-      tileHeight: 58,
+      tileHeight: _guide != null ? 66 : 58,
       itemBuilder: (_, i) {
         final it = items[i];
+        final nowE = _nowFor(it);
         return ListTile(
           selected: _selected?.id == it.id,
           // Número de canal: coincide con el zapping por número (teclas 0-9).
@@ -377,6 +421,14 @@ class _ChannelListScreenState extends ConsumerState<ChannelListScreen> {
             ],
           ),
           title: Text(it.name, maxLines: 1, overflow: TextOverflow.ellipsis),
+          subtitle: nowE == null
+              ? null
+              : Text(
+                  '${_hhmm(nowE.start)}–${_hhmm(nowE.end)} · ${nowE.title}',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style:
+                      const TextStyle(fontSize: 12, color: Colors.white54)),
           trailing: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -405,21 +457,28 @@ class _ChannelListScreenState extends ConsumerState<ChannelListScreen> {
 
   Widget _buildGrid(BuildContext context, List<MediaItem> items, bool wide) {
     final density = ref.watch(channelTileSizeProvider);
+    final showEpg = _guide != null;
     return GridView.builder(
       controller: _scroll,
       padding: const EdgeInsets.all(8),
       gridDelegate: SliverGridDelegateWithMaxCrossAxisExtent(
         maxCrossAxisExtent: _tileExtents[density],
-        childAspectRatio: 1.06,
+        // Con EPG la tarjeta es algo más alta para el programa y su hora.
+        childAspectRatio: showEpg ? 0.9 : 1.06,
         crossAxisSpacing: 8,
         mainAxisSpacing: 8,
       ),
       itemCount: items.length,
       itemBuilder: (_, i) {
         final it = items[i];
+        final nowE = _nowFor(it);
         return _ChannelCard(
           logo: _logo(it, size: _logoSizes[density]),
           name: it.name,
+          epgLine: nowE == null
+              ? (showEpg ? '' : null)
+              : '${_hhmm(nowE.start)}–${_hhmm(nowE.end)} · ${nowE.title}',
+          epgProgress: nowE == null ? null : _epgProgress(nowE),
           selected: _selected?.id == it.id,
           favorite: it.isFavorite,
           onTap: () => _onTap(it, wide),
@@ -517,6 +576,12 @@ class _ChannelListScreenState extends ConsumerState<ChannelListScreen> {
 class _ChannelCard extends StatefulWidget {
   final Widget logo;
   final String name;
+
+  /// Programa en emisión con su franja ("20:30–22:00 · Telediario").
+  /// '' reserva la línea sin datos (para que la cuadrícula no baile);
+  /// null = la lista no tiene guía y la línea no existe.
+  final String? epgLine;
+  final double? epgProgress;
   final bool selected;
   final bool favorite;
   final VoidCallback onTap;
@@ -525,6 +590,8 @@ class _ChannelCard extends StatefulWidget {
   const _ChannelCard({
     required this.logo,
     required this.name,
+    this.epgLine,
+    this.epgProgress,
     required this.selected,
     required this.favorite,
     required this.onTap,
@@ -566,7 +633,7 @@ class _ChannelCardState extends State<_ChannelCard> {
                   // Altura fija (2 líneas) para que el logo no baile según la
                   // longitud del nombre.
                   Padding(
-                    padding: const EdgeInsets.fromLTRB(6, 0, 6, 8),
+                    padding: const EdgeInsets.fromLTRB(6, 0, 6, 4),
                     child: SizedBox(
                       height: 32,
                       child: Center(
@@ -580,6 +647,37 @@ class _ChannelCardState extends State<_ChannelCard> {
                       ),
                     ),
                   ),
+                  // Programa en emisión + avance (si la lista tiene guía).
+                  if (widget.epgLine != null)
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(8, 0, 8, 7),
+                      child: Column(
+                        children: [
+                          SizedBox(
+                            height: 14,
+                            child: Text(
+                              widget.epgLine!,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              textAlign: TextAlign.center,
+                              style: const TextStyle(
+                                  fontSize: 10.5, color: Colors.white54),
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(2),
+                            child: LinearProgressIndicator(
+                              value: widget.epgProgress ?? 0,
+                              minHeight: 3,
+                              backgroundColor: Colors.white10,
+                            ),
+                          ),
+                        ],
+                      ),
+                    )
+                  else
+                    const SizedBox(height: 4),
                 ],
               ),
               if (widget.favorite)

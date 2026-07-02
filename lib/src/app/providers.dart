@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/legacy.dart';
 import 'package:package_info_plus/package_info_plus.dart';
@@ -518,6 +519,30 @@ final sortModeProvider = StateProvider<SortMode>((ref) {
 void setSortMode(WidgetRef ref, SortMode mode) {
   ref.read(sortModeProvider.notifier).state = mode;
   ref.read(sharedPrefsProvider).setInt('sort_mode', mode.index);
+}
+
+/// Orden personalizado de canales por categoría (drag & drop): nombre de la
+/// categoría -> lista de ids en el orden elegido. Persistido.
+final channelOrderProvider =
+    StateProvider<Map<String, List<String>>>((ref) {
+  final raw = ref.watch(sharedPrefsProvider).getString('channel_order');
+  if (raw == null || raw.isEmpty) return const {};
+  try {
+    final decoded = jsonDecode(raw) as Map<String, dynamic>;
+    return {
+      for (final e in decoded.entries)
+        if (e.value is List)
+          e.key: [for (final id in e.value as List) '$id'],
+    };
+  } catch (_) {
+    return const {};
+  }
+});
+
+void setChannelOrder(WidgetRef ref, String category, List<String> ids) {
+  final next = {...ref.read(channelOrderProvider), category: ids};
+  ref.read(channelOrderProvider.notifier).state = next;
+  ref.read(sharedPrefsProvider).setString('channel_order', jsonEncode(next));
 }
 
 /// Tamaño de los tiles de la cuadrícula de canales (0=compacto, 1=medio,

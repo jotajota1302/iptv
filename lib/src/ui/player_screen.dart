@@ -66,9 +66,19 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
   int _positionSeconds = 0;
   Duration _duration = Duration.zero;
 
+  // Estado de los controles propios (barra inferior).
+  bool _playing = false;
+  bool _buffering = false;
+  bool _dragging = false;
+  double _dragValue = 0;
+  // Tras un seek manual se ignoran las posiciones viejas que el stream aún
+  // emite; sin esto la barra "vuelve atrás" un instante al soltar.
+  DateTime _ignoreStreamUntil = DateTime.fromMillisecondsSinceEpoch(0);
+
   // Pistas disponibles (audio/subtítulos) para poder elegirlas.
   List<AudioTrack> _audioTracks = [];
   List<SubtitleTrack> _subtitleTracks = [];
+  Track? _currentTracks;
 
   // OSD (nombre del canal + programa actual) al entrar en un canal.
   bool _osdVisible = false;
@@ -124,6 +134,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     );
     _subs.add(_ctrl.player.stream.playing.listen((p) {
       if (!mounted) return;
+      setState(() => _playing = p);
       // En pausa la barra queda visible; al reproducir se oculta sola.
       if (!p) {
         _uiTimer?.cancel();
@@ -131,6 +142,37 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
       } else {
         _scheduleUiHide();
       }
+    }));
+    // Posición y duración para la barra de progreso propia. Una fuente única
+    // (este listener) para la UI, el clamp de los saltos y el guardado.
+    _subs.add(_ctrl.player.stream.duration.listen((d) {
+      final changed = d.inSeconds != _duration.inSeconds;
+      _duration = d;
+      if (widget.resume) _maybeSeek();
+      if (changed && mounted) setState(() {});
+    }));
+    _subs.add(_ctrl.player.stream.position.listen((pos) {
+      if (DateTime.now().isBefore(_ignoreStreamUntil)) return;
+      final s = pos.inSeconds;
+      final changed = s != _positionSeconds;
+      _positionSeconds = s;
+      if (widget.resume) {
+        _maybeSeek();
+        // Guarda cada 10s de avance, pero solo tras resolver el salto de
+        // reanudar (evita pisar la posición guardada con el arranque en 0).
+        if (_seeked && (s - _lastSaved).abs() >= 10) {
+          _lastSaved = s;
+          _save();
+        }
+      }
+      // setState solo al cambiar el segundo y sin arrastre en curso.
+      if (changed && !_dragging && mounted) setState(() {});
+    }));
+    _subs.add(_ctrl.player.stream.buffering.listen((b) {
+      if (mounted && b != _buffering) setState(() => _buffering = b);
+    }));
+    _subs.add(_ctrl.player.stream.track.listen((t) {
+      if (mounted) setState(() => _currentTracks = t);
     }));
     _subs.add(_ctrl.player.stream.tracks.listen((t) {
       if (!mounted) return;
@@ -153,8 +195,8 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
   }
 
   /// Configura la lógica de reanudar: lee la posición guardada de la BD (fuente
-  /// de verdad; el dato del grid puede estar obsoleto), y al conocer la duración
-  /// salta a esa posición. Guarda el progreso cada ~10s.
+  /// de verdad; el dato del grid puede estar obsoleto). El salto se resuelve
+  /// desde los listeners de posición/duración de initState.
   void _setupResume() {
     _savedPosition = widget.item.positionSeconds; // provisional hasta leer BD
     ref
@@ -168,22 +210,6 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
       _savedLoaded = true;
       _maybeSeek();
     });
-
-    final player = _ctrl.player;
-    _subs.add(player.stream.duration.listen((d) {
-      _duration = d;
-      _maybeSeek();
-    }));
-    _subs.add(player.stream.position.listen((pos) {
-      _positionSeconds = pos.inSeconds;
-      _maybeSeek();
-      // Guarda cada 10s de avance, pero solo tras resolver el salto de reanudar
-      // (evita sobrescribir la posición guardada con la del arranque en 0).
-      if (_seeked && (_positionSeconds - _lastSaved).abs() >= 10) {
-        _lastSaved = _positionSeconds;
-        _save();
-      }
-    }));
   }
 
   /// Salta a la posición guardada una sola vez, cuando ya se ha leído de la BD,
@@ -306,8 +332,18 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
   };
 
   void _seekBy(int seconds) {
-    final target = (_positionSeconds + seconds).clamp(0, _duration.inSeconds);
-    _ctrl.player.seek(Duration(seconds: target));
+    if (_duration.inSeconds <= 0) return;
+    _seekTo((_positionSeconds + seconds).clamp(0, _duration.inSeconds));
+  }
+
+  /// Salto manual: actualiza la UI al instante e ignora brevemente las
+  /// posiciones antiguas que el stream sigue emitiendo tras el seek.
+  void _seekTo(int seconds) {
+    _positionSeconds = seconds;
+    _ignoreStreamUntil =
+        DateTime.now().add(const Duration(milliseconds: 700));
+    _ctrl.player.seek(Duration(seconds: seconds));
+    if (mounted) setState(() {});
   }
 
   void _bumpVolume(double delta) {
@@ -401,6 +437,25 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
           duration: _duration.inSeconds);
     }
     _playAt(widget.queueIndex + 1);
+  }
+
+  /// Etiquetas únicas para el menú: las pistas con el mismo título/idioma
+  /// (muy común en streams IPTV) se numeran para no ver entradas repetidas.
+  List<(T, String)> _numbered<T>(List<T> tracks, String Function(T) label) {
+    final total = <String, int>{};
+    for (final t in tracks) {
+      total.update(label(t), (v) => v + 1, ifAbsent: () => 1);
+    }
+    final seen = <String, int>{};
+    return [
+      for (final t in tracks)
+        (
+          t,
+          total[label(t)]! > 1
+              ? '${label(t)} (${seen.update(label(t), (v) => v + 1, ifAbsent: () => 1)})'
+              : label(t)
+        ),
+    ];
   }
 
   String _audioLabel(AudioTrack t) {
@@ -564,13 +619,16 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     // Selección de audio (solo si hay más de una pista real).
     final audios = _audioTracks.where((t) => t.id != 'auto').toList();
     if (audios.length > 1) {
+      final currentAudio = _currentTracks?.audio.id;
       actions.add(PopupMenuButton<AudioTrack>(
         icon: const Icon(Icons.multitrack_audio),
         tooltip: 'Audio',
         onSelected: (t) => _ctrl.player.setAudioTrack(t),
         itemBuilder: (_) => [
-          for (final t in _audioTracks.where((t) => t.id != 'no'))
-            PopupMenuItem(value: t, child: Text(_audioLabel(t))),
+          for (final (t, label) in _numbered(
+              _audioTracks.where((t) => t.id != 'no').toList(), _audioLabel))
+            CheckedPopupMenuItem(
+                value: t, checked: t.id == currentAudio, child: Text(label)),
         ],
       ));
     }
@@ -578,15 +636,20 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     final subs = _subtitleTracks.where((t) => t.id != 'auto').toList();
     final hasRealSubs = subs.any((t) => t.id != 'no');
     if (hasRealSubs) {
+      final currentSub = _currentTracks?.subtitle.id ?? 'no';
       actions.add(PopupMenuButton<SubtitleTrack>(
         icon: const Icon(Icons.subtitles),
         tooltip: 'Subtítulos',
         onSelected: (t) => _ctrl.player.setSubtitleTrack(t),
         itemBuilder: (_) => [
-          PopupMenuItem(
-              value: SubtitleTrack.no(), child: Text(_subLabel(SubtitleTrack.no()))),
-          for (final t in subs.where((t) => t.id != 'no'))
-            PopupMenuItem(value: t, child: Text(_subLabel(t))),
+          CheckedPopupMenuItem(
+              value: SubtitleTrack.no(),
+              checked: currentSub == 'no' || currentSub == 'auto',
+              child: Text(_subLabel(SubtitleTrack.no()))),
+          for (final (t, label) in _numbered(
+              subs.where((t) => t.id != 'no').toList(), _subLabel))
+            CheckedPopupMenuItem(
+                value: t, checked: t.id == currentSub, child: Text(label)),
         ],
       ));
     }
@@ -703,23 +766,181 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
         ],
       );
 
+  /// El vídeo sin controles integrados: la barra inferior es nuestra (los
+  /// controles por defecto de media_kit fallaban a veces con el avance).
+  Widget _rawVideo(BoxFit fit) =>
+      Video(controller: _video, fit: fit, controls: NoVideoControls);
+
   /// El vídeo con el modo de aspecto/zoom elegido.
   Widget _videoView() => switch (_fit) {
-        FitMode.auto =>
-          Center(child: Video(controller: _video, fit: BoxFit.contain)),
-        FitMode.stretch =>
-          Center(child: Video(controller: _video, fit: BoxFit.fill)),
-        FitMode.crop =>
-          Center(child: Video(controller: _video, fit: BoxFit.cover)),
+        FitMode.auto => Center(child: _rawVideo(BoxFit.contain)),
+        FitMode.stretch => Center(child: _rawVideo(BoxFit.fill)),
+        FitMode.crop => Center(child: _rawVideo(BoxFit.cover)),
         FitMode.ratio169 => Center(
             child: AspectRatio(
-                aspectRatio: 16 / 9,
-                child: Video(controller: _video, fit: BoxFit.fill))),
+                aspectRatio: 16 / 9, child: _rawVideo(BoxFit.fill))),
         FitMode.ratio43 => Center(
             child: AspectRatio(
-                aspectRatio: 4 / 3,
-                child: Video(controller: _video, fit: BoxFit.fill))),
+                aspectRatio: 4 / 3, child: _rawVideo(BoxFit.fill))),
       };
+
+  String _fmtTime(int s) {
+    final h = s ~/ 3600, m = (s % 3600) ~/ 60, sec = s % 60;
+    final mm = m.toString().padLeft(2, '0');
+    final ss = sec.toString().padLeft(2, '0');
+    return h > 0 ? '$h:$mm:$ss' : '$mm:$ss';
+  }
+
+  /// Barra de controles inferior propia: progreso con arrastre fiable,
+  /// tiempos, play/pausa y ±10s. En directo no hay barra de progreso.
+  Widget _bottomBar() {
+    final total = _duration.inSeconds;
+    final canSeek = !_isLive && total > 0;
+    final pos = _dragging
+        ? _dragValue.round()
+        : _positionSeconds.clamp(0, total > 0 ? total : _positionSeconds);
+    return Container(
+      padding: const EdgeInsets.fromLTRB(10, 26, 10, 6),
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [Colors.transparent, Color(0xCC000000)],
+        ),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (canSeek)
+            SliderTheme(
+              data: SliderTheme.of(context).copyWith(
+                trackHeight: 3,
+                thumbShape:
+                    const RoundSliderThumbShape(enabledThumbRadius: 6.5),
+                overlayShape:
+                    const RoundSliderOverlayShape(overlayRadius: 13),
+              ),
+              child: Slider(
+                value: pos.toDouble().clamp(0, total.toDouble()),
+                max: total.toDouble(),
+                onChangeStart: (v) {
+                  setState(() {
+                    _dragging = true;
+                    _dragValue = v;
+                  });
+                  _pokeUi();
+                },
+                onChanged: (v) => setState(() => _dragValue = v),
+                onChangeEnd: (v) {
+                  _dragging = false;
+                  _seekTo(v.round());
+                },
+              ),
+            ),
+          Row(
+            children: [
+              IconButton(
+                icon: Icon(_playing ? Icons.pause : Icons.play_arrow,
+                    size: 30),
+                tooltip: _playing ? 'Pausa (Espacio)' : 'Reproducir (Espacio)',
+                onPressed: () {
+                  _ctrl.player.playOrPause();
+                  _pokeUi();
+                },
+              ),
+              if (canSeek) ...[
+                IconButton(
+                  icon: const Icon(Icons.replay_10),
+                  tooltip: 'Retroceder 10 s (←)',
+                  onPressed: () {
+                    _seekBy(-10);
+                    _pokeUi();
+                  },
+                ),
+                IconButton(
+                  icon: const Icon(Icons.forward_10),
+                  tooltip: 'Avanzar 10 s (→)',
+                  onPressed: () {
+                    _seekBy(10);
+                    _pokeUi();
+                  },
+                ),
+              ],
+              const SizedBox(width: 6),
+              if (_isLive)
+                Row(children: [
+                  Container(
+                    width: 8,
+                    height: 8,
+                    decoration: const BoxDecoration(
+                        color: Colors.redAccent, shape: BoxShape.circle),
+                  ),
+                  const SizedBox(width: 6),
+                  const Text('DIRECTO',
+                      style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: 1)),
+                ])
+              else
+                Text(
+                  total > 0
+                      ? '${_fmtTime(pos)} / ${_fmtTime(total)}'
+                      : _fmtTime(pos),
+                  style: const TextStyle(
+                      fontSize: 12.5, color: Colors.white70),
+                ),
+              const Spacer(),
+              if (_buffering)
+                const Padding(
+                  padding: EdgeInsets.only(right: 12),
+                  child: SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2)),
+                ),
+              IconButton(
+                icon: Icon(_mutedVolume != null
+                    ? Icons.volume_off
+                    : Icons.volume_up),
+                tooltip: 'Silenciar (M)',
+                onPressed: () {
+                  _toggleMute();
+                  _pokeUi();
+                  setState(() {});
+                },
+              ),
+              SizedBox(
+                width: 110,
+                child: SliderTheme(
+                  data: SliderTheme.of(context).copyWith(
+                    trackHeight: 3,
+                    thumbShape:
+                        const RoundSliderThumbShape(enabledThumbRadius: 5),
+                    overlayShape:
+                        const RoundSliderOverlayShape(overlayRadius: 10),
+                  ),
+                  child: Slider(
+                    value: (_mutedVolume != null
+                            ? 0.0
+                            : _ctrl.player.state.volume)
+                        .clamp(0.0, 100.0),
+                    max: 100,
+                    onChanged: (v) {
+                      _mutedVolume = null;
+                      _ctrl.player.setVolume(v);
+                      setState(() {});
+                      _pokeUi();
+                    },
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
 
   /// Barra superior que se desvanece durante la reproducción (UI inmersiva).
   PreferredSizeWidget _appBar() => PreferredSize(
@@ -775,11 +996,25 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
             child: Stack(
               children: [
                 _videoView(),
+                // Controles inferiores propios (progreso, play/pausa, volumen).
+                Positioned(
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  child: AnimatedOpacity(
+                    opacity: _uiVisible ? 1 : 0,
+                    duration: const Duration(milliseconds: 250),
+                    child: IgnorePointer(
+                      ignoring: !_uiVisible,
+                      child: _bottomBar(),
+                    ),
+                  ),
+                ),
                 // OSD de canal (nombre + programa actual), se desvanece solo.
                 if (_isLive)
                   Positioned(
                     left: 16,
-                    bottom: 16,
+                    bottom: 96,
                     child: IgnorePointer(
                       child: AnimatedOpacity(
                         opacity: _osdVisible ? 1 : 0,
