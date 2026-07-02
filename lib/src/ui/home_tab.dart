@@ -20,15 +20,34 @@ import 'widgets/content_rail.dart';
 class HomeTab extends ConsumerWidget {
   const HomeTab({super.key});
 
-  String _greeting(int hour) {
-    if (hour < 6) return 'Buenas noches';
-    if (hour < 13) return 'Buenos días';
-    if (hour < 21) return 'Buenas tardes';
-    return 'Buenas noches';
-  }
-
   void _goTab(WidgetRef ref, int i) =>
       ref.read(selectedTabProvider.notifier).state = i;
+
+  /// Mezcla los últimos estrenos de películas y series intercalados para el
+  /// carrusel jukebox (solo entradas con carátula).
+  List<_Featured> _featured(List<MediaItem> ms, List<SeriesGroup> ss) {
+    final movies = [
+      for (final m in ms)
+        if (m.logoUrl != null)
+          _Featured(title: m.name, poster: m.logoUrl, item: m)
+    ];
+    final series = [
+      for (final s in ss)
+        if (s.poster != null && s.episodeCount > 0)
+          _Featured(
+              title: s.title,
+              poster: s.poster,
+              item: s.seasons[s.sortedSeasons.first]!.first.item,
+              series: s)
+    ];
+    final out = <_Featured>[];
+    var mi = 0, si = 0;
+    while (out.length < 15 && (mi < movies.length || si < series.length)) {
+      if (mi < movies.length) out.add(movies[mi++]);
+      if (si < series.length && out.length < 15) out.add(series[si++]);
+    }
+    return out;
+  }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -37,13 +56,10 @@ class HomeTab extends ConsumerWidget {
     final cont = ref.watch(continueWatchingProvider);
     final favs = ref.watch(favoritesProvider);
     final nowOn = ref.watch(nowOnFavoritesProvider);
-    final hour = TimeOfDay.now().hour;
 
     final loading = movies.isLoading && series.isLoading;
-    final featured = (movies.value ?? const <MediaItem>[])
-        .where((m) => m.logoUrl != null)
-        .take(14)
-        .toList();
+    final featured = _featured(
+        movies.value ?? const [], series.value ?? const []);
 
     final nothing = !loading &&
         (movies.value ?? const []).isEmpty &&
@@ -64,11 +80,11 @@ class HomeTab extends ConsumerWidget {
         child: ListView(
           padding: const EdgeInsets.only(bottom: 24),
           children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-              child: Text('${_greeting(hour)} 👋',
-                  style: const TextStyle(
-                      fontSize: 24, fontWeight: FontWeight.w800)),
+            const Padding(
+              padding: EdgeInsets.fromLTRB(16, 12, 16, 0),
+              child: Text('Últimos estrenos',
+                  style:
+                      TextStyle(fontSize: 22, fontWeight: FontWeight.w800)),
             ),
             if (loading) ...[
               const SizedBox(height: 12),
@@ -76,7 +92,7 @@ class HomeTab extends ConsumerWidget {
               const RailSkeleton(),
             ],
             if (nothing) _EmptyHome(onAdd: () => _goTab(ref, 5)),
-            if (featured.isNotEmpty) _Hero(movies: featured),
+            if (featured.isNotEmpty) _Hero(items: featured),
             _railNowOn(context, nowOn.value ?? const []),
             _railContinue(context, ref, cont.value ?? const []),
             _railMovies(context, ref, movies.value ?? const []),
@@ -190,12 +206,24 @@ class HomeTab extends ConsumerWidget {
   }
 }
 
-/// Carrusel "jukebox" de novedades: fila de carátulas todas visibles con la
-/// central destacada (más grande y con acento) y la ficha compacta debajo.
-/// Aprovecha todo el ancho de la ventana sin dejar espacio muerto.
+/// Un estreno del jukebox: película o serie (con su grupo para abrirla).
+class _Featured {
+  final String title;
+  final String? poster;
+  final MediaItem item; // la película, o un episodio de la serie
+  final SeriesGroup? series; // != null si es serie
+  const _Featured(
+      {required this.title, required this.poster, required this.item, this.series});
+
+  bool get isSeries => series != null;
+}
+
+/// Carrusel "jukebox" de últimos estrenos (películas y series): fila de
+/// carátulas todas visibles con la central destacada (más grande y con
+/// acento) y la ficha compacta debajo. Aprovecha todo el ancho.
 class _Hero extends StatefulWidget {
-  final List<MediaItem> movies;
-  const _Hero({required this.movies});
+  final List<_Featured> items;
+  const _Hero({required this.items});
   @override
   State<_Hero> createState() => _HeroState();
 }
@@ -203,7 +231,17 @@ class _Hero extends StatefulWidget {
 class _HeroState extends State<_Hero> {
   PageController? _pc;
   double _fraction = 0;
-  int _page = 0;
+
+  /// Arranca enfocado en el centro de la lista: se puede navegar hacia los
+  /// dos lados desde el primer momento.
+  late int _page = widget.items.length ~/ 2;
+
+  void _openDetail(_Featured f) {
+    Navigator.of(context).push(MaterialPageRoute(
+        builder: (_) => f.isSeries
+            ? SeriesDetailScreen(series: f.series!)
+            : MovieDetailScreen(item: f.item)));
+  }
 
   /// El PageController depende del ancho (cada carátula ≈176 px lógicos);
   /// se recrea si la ventana cambia de tamaño, conservando la página.
@@ -225,19 +263,19 @@ class _HeroState extends State<_Hero> {
   }
 
   void _go(int delta) {
-    final target = (_page + delta).clamp(0, widget.movies.length - 1);
+    final target = (_page + delta).clamp(0, widget.items.length - 1);
     _pc?.animateToPage(target,
         duration: const Duration(milliseconds: 350), curve: Curves.easeOut);
   }
 
   @override
   Widget build(BuildContext context) {
-    final movies = widget.movies;
+    final items = widget.items;
     return Column(
       children: [
         const SizedBox(height: 12),
         SizedBox(
-          height: 236,
+          height: 272,
           child: LayoutBuilder(
             builder: (context, constraints) {
               _ensureController(constraints.maxWidth);
@@ -247,7 +285,7 @@ class _HeroState extends State<_Hero> {
                 children: [
                   PageView.builder(
                     controller: pc,
-                    itemCount: movies.length,
+                    itemCount: items.length,
                     onPageChanged: (i) => setState(() => _page = i),
                     itemBuilder: (_, i) => AnimatedBuilder(
                       animation: pc,
@@ -255,28 +293,41 @@ class _HeroState extends State<_Hero> {
                         final page = pc.position.haveDimensions
                             ? (pc.page ?? _page.toDouble())
                             : _page.toDouble();
-                        final d = (page - i).abs().clamp(0.0, 3.0);
-                        final scale = 1.0 - (d * 0.13).clamp(0.0, 0.34);
-                        final opacity = 1.0 - (d * 0.22).clamp(0.0, 0.62);
+                        // Coverflow: las laterales se inclinan hacia el
+                        // centro, bajan en arco, encogen y se oscurecen de
+                        // forma continua según su distancia al foco.
+                        final signed = (page - i).toDouble();
+                        final d = signed.abs().clamp(0.0, 4.0);
+                        final scale = (1.0 - d * 0.12).clamp(0.60, 1.0);
+                        final dy = (d * 15).clamp(0.0, 50.0);
+                        final angle = signed.clamp(-2.2, 2.2) * -0.24;
+                        final dim = (d * 0.22).clamp(0.0, 0.55);
+                        final focus = (1.0 - d * 1.6).clamp(0.0, 1.0);
+                        final m = Matrix4.identity()
+                          ..setEntry(3, 2, 0.0016)
+                          ..rotateY(angle)
+                          ..scaleByDouble(scale, scale, scale, 1);
                         return Center(
-                          child: Opacity(
-                            opacity: opacity,
-                            child: Transform.scale(
-                              scale: scale,
+                          child: Transform.translate(
+                            offset: Offset(0, dy),
+                            child: Transform(
+                              transform: m,
+                              alignment: Alignment.center,
                               child: _JukeboxCard(
-                                movie: movies[i],
-                                focused: i == _page,
+                                poster: items[i].poster,
+                                fallbackIcon: items[i].isSeries
+                                    ? Icons.theaters
+                                    : Icons.movie_outlined,
+                                focus: focus,
+                                dim: dim,
                                 onTap: () {
                                   if (i == _page) {
-                                    Navigator.of(context).push(
-                                        MaterialPageRoute(
-                                            builder: (_) => MovieDetailScreen(
-                                                item: movies[i])));
+                                    _openDetail(items[i]);
                                   } else {
                                     pc.animateToPage(i,
                                         duration:
-                                            const Duration(milliseconds: 350),
-                                        curve: Curves.easeOut);
+                                            const Duration(milliseconds: 420),
+                                        curve: Curves.easeOutCubic);
                                   }
                                 },
                               ),
@@ -292,7 +343,7 @@ class _HeroState extends State<_Hero> {
                       child: _HeroArrow(
                           icon: Icons.chevron_left, onTap: () => _go(-1)),
                     ),
-                  if (_page < movies.length - 1)
+                  if (_page < items.length - 1)
                     Positioned(
                       right: 8,
                       child: _HeroArrow(
@@ -308,67 +359,120 @@ class _HeroState extends State<_Hero> {
         AnimatedSwitcher(
           duration: const Duration(milliseconds: 250),
           child: _FocusedInfo(
-              key: ValueKey(movies[_page].id), movie: movies[_page]),
+              key: ValueKey(items[_page].item.id), featured: items[_page]),
         ),
       ],
     );
   }
 }
 
-/// Carátula 2:3 del jukebox; la enfocada lleva borde de acento y sombra.
+/// Carátula 2:3 del jukebox con reflejo tipo máquina de discos. El halo y el
+/// borde de acento se funden de forma continua con [focus] (0..1) y las
+/// laterales se oscurecen con [dim].
 class _JukeboxCard extends StatelessWidget {
-  final MediaItem movie;
-  final bool focused;
+  final String? poster;
+  final IconData fallbackIcon;
+  final double focus;
+  final double dim;
   final VoidCallback onTap;
-  const _JukeboxCard(
-      {required this.movie, required this.focused, required this.onTap});
+  const _JukeboxCard({
+    required this.poster,
+    required this.fallbackIcon,
+    required this.focus,
+    required this.dim,
+    required this.onTap,
+  });
+
+  Widget _image() => poster == null
+      ? Container(color: kSurfaceHigh, child: Icon(fallbackIcon, size: 40))
+      : CachedNetworkImage(
+          imageUrl: poster!,
+          fit: BoxFit.cover,
+          errorWidget: (_, _, _) => Container(
+              color: kSurfaceHigh, child: Icon(fallbackIcon, size: 40)),
+        );
 
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: onTap,
       child: AspectRatio(
-        aspectRatio: 2 / 3,
-        child: Container(
-          margin: const EdgeInsets.symmetric(horizontal: 5),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(12),
-            border: focused ? Border.all(color: kAccent, width: 2.5) : null,
-            boxShadow: focused
-                ? [
-                    BoxShadow(
-                        color: kAccent.withValues(alpha: 0.35),
-                        blurRadius: 18,
-                        spreadRadius: 1)
-                  ]
-                : const [
-                    BoxShadow(color: Colors.black54, blurRadius: 8),
+        // 2:3 de la carátula + banda inferior para el reflejo.
+        aspectRatio: 2 / 3.5,
+        child: Column(
+          children: [
+            Expanded(
+              flex: 100,
+              child: Container(
+                margin: const EdgeInsets.symmetric(horizontal: 5),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(12),
+                  border: focus > 0.05
+                      ? Border.all(
+                          color: kAccent.withValues(alpha: focus),
+                          width: 2.5 * focus)
+                      : null,
+                  boxShadow: [
+                    if (focus > 0.05)
+                      BoxShadow(
+                          color: kAccent.withValues(alpha: 0.38 * focus),
+                          blurRadius: 20,
+                          spreadRadius: 1),
+                    const BoxShadow(color: Colors.black54, blurRadius: 8),
                   ],
-          ),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(9.5),
-            child: movie.logoUrl == null
-                ? Container(
-                    color: kSurfaceHigh,
-                    child: const Icon(Icons.movie_outlined, size: 40))
-                : CachedNetworkImage(
-                    imageUrl: movie.logoUrl!,
-                    fit: BoxFit.cover,
-                    errorWidget: (_, _, _) => Container(
-                        color: kSurfaceHigh,
-                        child: const Icon(Icons.movie_outlined, size: 40)),
+                ),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(9.5),
+                  child: Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      _image(),
+                      if (dim > 0.01) Container(color: Colors.black.withValues(alpha: dim)),
+                    ],
                   ),
-          ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 3),
+            // Reflejo: la carátula invertida desvaneciéndose, como en las
+            // máquinas de discos.
+            Expanded(
+              flex: 16,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 5),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(6),
+                  child: ShaderMask(
+                    shaderCallback: (r) => const LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [Colors.white30, Colors.transparent],
+                    ).createShader(r),
+                    blendMode: BlendMode.dstIn,
+                    child: Transform.flip(
+                      flipY: true,
+                      child: OverflowBox(
+                        alignment: Alignment.topCenter,
+                        maxHeight: double.infinity,
+                        child: AspectRatio(aspectRatio: 2 / 3, child: _image()),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );
   }
 }
 
-/// Título + metadatos + acciones de la película enfocada en el jukebox.
+/// Título + metadatos + acciones del estreno enfocado en el jukebox
+/// (película o serie).
 class _FocusedInfo extends ConsumerWidget {
-  final MediaItem movie;
-  const _FocusedInfo({super.key, required this.movie});
+  final _Featured featured;
+  const _FocusedInfo({super.key, required this.featured});
 
   Widget _pill(String text) => Container(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
@@ -381,17 +485,33 @@ class _FocusedInfo extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final info = ref.watch(vodInfoProvider(movie.streamUrl)).value;
+    final f = featured;
+    String? year, genre, rating;
+    if (f.isSeries) {
+      final info = ref
+          .watch(seriesInfoProvider(
+              (streamUrl: f.item.streamUrl, title: f.series!.title)))
+          .value;
+      year = info?.year;
+      genre = info?.genre;
+      rating = info?.rating;
+    } else {
+      final info = ref.watch(vodInfoProvider(f.item.streamUrl)).value;
+      year = info?.year;
+      genre = info?.genre;
+      rating = info?.rating;
+    }
     final meta = <String>[
-      if (info?.year != null) info!.year!,
-      if ((info?.genre ?? '').isNotEmpty) info!.genre!,
-      if ((info?.rating ?? '').isNotEmpty) '⭐ ${info!.rating}',
+      if (f.isSeries) 'Serie · ${f.series!.sortedSeasons.length} temporada(s)',
+      ?year,
+      if ((genre ?? '').isNotEmpty) genre!,
+      if ((rating ?? '').isNotEmpty) '⭐ $rating',
     ];
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 24),
       child: Column(
         children: [
-          Text(movie.name,
+          Text(f.title,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               textAlign: TextAlign.center,
@@ -410,18 +530,30 @@ class _FocusedInfo extends ConsumerWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              FilledButton.icon(
-                onPressed: () => openPlayer(context, movie),
-                icon: const Icon(Icons.play_arrow, size: 20),
-                label: const Text('Ver'),
-              ),
-              const SizedBox(width: 8),
-              OutlinedButton.icon(
-                onPressed: () => Navigator.of(context).push(MaterialPageRoute(
-                    builder: (_) => MovieDetailScreen(item: movie))),
-                icon: const Icon(Icons.info_outline, size: 18),
-                label: const Text('Info'),
-              ),
+              if (f.isSeries)
+                FilledButton.icon(
+                  onPressed: () => Navigator.of(context).push(
+                      MaterialPageRoute(
+                          builder: (_) =>
+                              SeriesDetailScreen(series: f.series!))),
+                  icon: const Icon(Icons.theaters, size: 18),
+                  label: const Text('Ver serie'),
+                )
+              else ...[
+                FilledButton.icon(
+                  onPressed: () => openPlayer(context, f.item),
+                  icon: const Icon(Icons.play_arrow, size: 20),
+                  label: const Text('Ver'),
+                ),
+                const SizedBox(width: 8),
+                OutlinedButton.icon(
+                  onPressed: () => Navigator.of(context).push(
+                      MaterialPageRoute(
+                          builder: (_) => MovieDetailScreen(item: f.item))),
+                  icon: const Icon(Icons.info_outline, size: 18),
+                  label: const Text('Info'),
+                ),
+              ],
             ],
           ),
         ],
