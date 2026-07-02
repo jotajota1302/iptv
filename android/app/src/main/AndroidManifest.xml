@@ -3,10 +3,17 @@
          no usan https). -->
     <uses-permission android:name="android.permission.INTERNET"/>
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
+
+    <!-- Android TV: no requiere pantalla táctil y soporta el lanzador Leanback.
+         'required=false' para que también funcione en móviles/tablets. -->
+    <uses-feature android:name="android.hardware.touchscreen" android:required="false"/>
+    <uses-feature android:name="android.software.leanback" android:required="false"/>
+
     <application
         android:label="iptv_player"
         android:name="${applicationName}"
         android:usesCleartextTraffic="true"
+        android:banner="@mipmap/ic_launcher"
         android:icon="@mipmap/ic_launcher">
         <activity
             android:name=".MainActivity"
@@ -28,6 +35,8 @@
             <intent-filter>
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
+                <!-- Aparecer en el lanzador de Android TV. -->
+                <category android:name="android.intent.category.LEANBACK_LAUNCHER"/>
             </intent-filter>
         </activity>
         <!-- Don't delete the meta-data below.
