@@ -67,4 +67,16 @@ class PlaylistsNotifier extends StateNotifier<PlaylistsState> {
     state = PlaylistsState(state.playlists, id);
     _persist();
   }
+
+  /// Edita el nombre y/o la URL de una lista (p. ej. al cambiar la contraseña).
+  void update(String id, {String? name, String? url}) {
+    final list = state.playlists
+        .map((p) => p.id == id
+            ? SavedPlaylist(
+                id: p.id, name: name ?? p.name, url: url ?? p.url)
+            : p)
+        .toList();
+    state = PlaylistsState(list, state.activeId);
+    _persist();
+  }
 }

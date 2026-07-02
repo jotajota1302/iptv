@@ -64,6 +64,54 @@ class _SettingsTabState extends ConsumerState<SettingsTab> {
     await _run(() => ref.read(playlistRepositoryProvider).loadFromUrl(pl.url));
   }
 
+  /// Edita nombre y URL de una lista (p. ej. al cambiar la contraseña). Si
+  /// cambia la URL y es la lista activa, la recarga.
+  Future<void> _editPlaylist(SavedPlaylist pl) async {
+    final nameC = TextEditingController(text: pl.name);
+    final urlC = TextEditingController(text: pl.url);
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Editar lista'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: nameC,
+              decoration: const InputDecoration(labelText: 'Nombre'),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: urlC,
+              maxLines: 3,
+              minLines: 1,
+              decoration: const InputDecoration(labelText: 'URL de la lista'),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Cancelar')),
+          FilledButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('Guardar')),
+        ],
+      ),
+    );
+    if (ok != true || !mounted) return;
+    final newName = nameC.text.trim().isEmpty ? pl.name : nameC.text.trim();
+    final newUrl = urlC.text.trim();
+    if (newUrl.isEmpty) return;
+    ref.read(playlistsProvider.notifier).update(pl.id, name: newName, url: newUrl);
+    // Si cambió la URL y es la activa, recargar el contenido con la nueva.
+    final isActive = ref.read(playlistsProvider).activeId == pl.id;
+    if (newUrl != pl.url && isActive) {
+      await _run(() => ref.read(playlistRepositoryProvider).loadFromUrl(newUrl));
+      ref.invalidate(accountInfoProvider(newUrl));
+    }
+  }
+
   /// Registra como "Mi lista" la lista que ya está cargada en la BD pero que no
   /// se guardó (cargada antes de existir la gestión de listas).
   void _recover(String url) {
@@ -195,13 +243,34 @@ class _SettingsTabState extends ConsumerState<SettingsTab> {
                   title: Text(pl.name),
                   subtitle: Text(pl.url,
                       maxLines: 1, overflow: TextOverflow.ellipsis),
-                  trailing: IconButton(
-                    icon: const Icon(Icons.delete_outline),
-                    tooltip: 'Eliminar lista',
-                    onPressed: _loading
-                        ? null
-                        : () =>
-                            ref.read(playlistsProvider.notifier).remove(pl.id),
+                  trailing: PopupMenuButton<String>(
+                    enabled: !_loading,
+                    onSelected: (a) {
+                      if (a == 'editar') {
+                        _editPlaylist(pl);
+                      } else if (a == 'recargar') {
+                        _activate(pl);
+                      } else if (a == 'eliminar') {
+                        ref.read(playlistsProvider.notifier).remove(pl.id);
+                      }
+                    },
+                    itemBuilder: (_) => const [
+                      PopupMenuItem(
+                          value: 'editar',
+                          child: ListTile(
+                              leading: Icon(Icons.edit),
+                              title: Text('Editar'))),
+                      PopupMenuItem(
+                          value: 'recargar',
+                          child: ListTile(
+                              leading: Icon(Icons.refresh),
+                              title: Text('Recargar'))),
+                      PopupMenuItem(
+                          value: 'eliminar',
+                          child: ListTile(
+                              leading: Icon(Icons.delete_outline),
+                              title: Text('Eliminar'))),
+                    ],
                   ),
                   onTap: _loading ? null : () => _activate(pl),
                 ),
