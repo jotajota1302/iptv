@@ -1,3 +1,4 @@
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'shimmer.dart';
 
@@ -29,8 +30,9 @@ class SectionHeader extends StatelessWidget {
   }
 }
 
-/// Carrusel horizontal de tarjetas de tamaño fijo.
-class ContentRail extends StatelessWidget {
+/// Carrusel horizontal de tarjetas de tamaño fijo, con barra de scroll
+/// visible (escritorio) y desplazamiento con la rueda del ratón.
+class ContentRail extends StatefulWidget {
   final String title;
   final VoidCallback? onSeeAll;
   final List<Widget> items;
@@ -46,20 +48,54 @@ class ContentRail extends StatelessWidget {
   });
 
   @override
+  State<ContentRail> createState() => _ContentRailState();
+}
+
+class _ContentRailState extends State<ContentRail> {
+  final _ctrl = ScrollController();
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  /// La rueda del ratón (vertical) desplaza el rail en horizontal.
+  void _onScroll(PointerSignalEvent e) {
+    if (e is! PointerScrollEvent || !_ctrl.hasClients) return;
+    final delta = e.scrollDelta.dy.abs() > e.scrollDelta.dx.abs()
+        ? e.scrollDelta.dy
+        : e.scrollDelta.dx;
+    _ctrl.jumpTo((_ctrl.offset + delta)
+        .clamp(0.0, _ctrl.position.maxScrollExtent));
+  }
+
+  @override
   Widget build(BuildContext context) {
-    if (items.isEmpty) return const SizedBox.shrink();
+    if (widget.items.isEmpty) return const SizedBox.shrink();
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        SectionHeader(title: title, onSeeAll: onSeeAll),
+        SectionHeader(title: widget.title, onSeeAll: widget.onSeeAll),
         SizedBox(
-          height: height,
-          child: ListView.separated(
-            scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            itemCount: items.length,
-            separatorBuilder: (_, _) => const SizedBox(width: 10),
-            itemBuilder: (_, i) => SizedBox(width: itemWidth, child: items[i]),
+          height: widget.height + 12,
+          child: Listener(
+            onPointerSignal: _onScroll,
+            child: Scrollbar(
+              controller: _ctrl,
+              thumbVisibility: true,
+              thickness: 3,
+              radius: const Radius.circular(2),
+              child: ListView.separated(
+                controller: _ctrl,
+                scrollDirection: Axis.horizontal,
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+                itemCount: widget.items.length,
+                separatorBuilder: (_, _) => const SizedBox(width: 10),
+                itemBuilder: (_, i) =>
+                    SizedBox(width: widget.itemWidth, child: widget.items[i]),
+              ),
+            ),
           ),
         ),
       ],
