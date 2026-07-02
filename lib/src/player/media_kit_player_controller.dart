@@ -50,6 +50,40 @@ class MediaKitPlayerController implements PlayerController {
         'demuxer-max-back-bytes', largeBuffer ? '32MiB' : '8MiB');
   }
 
+  /// Propiedades técnicas del stream en curso, para "Información del stream".
+  /// Best-effort: las que mpv no conozca salen como '—'.
+  Future<Map<String, String>> streamInfo() async {
+    final p = player.platform;
+    if (p is! NativePlayer) return {};
+    Future<String> get(String prop) async {
+      try {
+        final v = await p.getProperty(prop);
+        return v.isEmpty ? '—' : v;
+      } catch (_) {
+        return '—';
+      }
+    }
+
+    String fps(String v) {
+      final d = double.tryParse(v);
+      return d == null ? v : d.toStringAsFixed(d == d.roundToDouble() ? 0 : 2);
+    }
+
+    String mbps(String v) {
+      final d = double.tryParse(v);
+      return d == null ? v : '${(d / 1000000).toStringAsFixed(1)} Mbps';
+    }
+
+    return {
+      'Resolución': '${await get('width')} × ${await get('height')}',
+      'FPS': fps(await get('container-fps')),
+      'Códec de vídeo': await get('video-format'),
+      'Códec de audio': await get('audio-codec-name'),
+      'Bitrate de vídeo': mbps(await get('video-bitrate')),
+      'Decodificación': await get('hwdec-current'),
+    };
+  }
+
   @override
   Future<void> play() => player.play();
 

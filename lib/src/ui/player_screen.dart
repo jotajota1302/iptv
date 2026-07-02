@@ -1,15 +1,30 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io' show exit;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:media_kit_video/media_kit_video.dart';
+import '../app/desktop_window.dart';
 import '../app/providers.dart';
 import '../data/epg_service.dart';
 import '../domain/content_type.dart';
+import '../domain/lang_match.dart';
 import '../domain/media_item.dart';
 import '../player/media_kit_player_controller.dart';
+
+/// Modos de relación de aspecto / zoom del vídeo.
+enum FitMode {
+  auto('Auto'),
+  ratio169('16:9'),
+  ratio43('4:3'),
+  stretch('Estirar'),
+  crop('Recortar');
+
+  const FitMode(this.label);
+  final String label;
+}
 
 class PlayerScreen extends ConsumerStatefulWidget {
   final MediaItem item;
@@ -63,6 +78,22 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
   Timer? _sleepTimer;
   int _sleepMinutes = 0;
 
+  // Aspecto/zoom y velocidad de reproducción.
+  FitMode _fit = FitMode.auto;
+  double _rate = 1.0;
+
+  // UI inmersiva: la barra se oculta sola durante la reproducción.
+  bool _uiVisible = true;
+  Timer? _uiTimer;
+  bool _fullscreen = false;
+
+  // Zapping tecleando el número de canal.
+  String _numBuf = '';
+  Timer? _numTimer;
+
+  // Selección automática de pista por idioma preferido (una vez por apertura).
+  bool _langsApplied = false;
+
   bool get _isLive => widget.item.type == ContentType.live;
 
   @override
@@ -72,6 +103,17 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     final isVod = widget.item.type == ContentType.movie ||
         widget.item.type == ContentType.series;
     if (_isLive) _showOsd();
+    // Recordar el último canal visto (para "arrancar en el último canal").
+    if (_isLive && !widget.viewerWindow) {
+      ref.read(sharedPrefsProvider).setString(
+          'last_channel',
+          jsonEncode({
+            'name': widget.item.name,
+            'url': widget.item.streamUrl,
+            'group': widget.item.groupTitle,
+          }));
+    }
+    _scheduleUiHide();
     // VOD es progresivo (no entrelazado): sin bwdif y con búfer amplio para 4K.
     // TV en directo respeta el ajuste de desentrelazado.
     final deinterlace = isVod ? false : ref.read(deinterlaceProvider);
@@ -80,12 +122,23 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
       configuration:
           VideoControllerConfiguration(enableHardwareAcceleration: hwAccel),
     );
+    _subs.add(_ctrl.player.stream.playing.listen((p) {
+      if (!mounted) return;
+      // En pausa la barra queda visible; al reproducir se oculta sola.
+      if (!p) {
+        _uiTimer?.cancel();
+        if (!_uiVisible) setState(() => _uiVisible = true);
+      } else {
+        _scheduleUiHide();
+      }
+    }));
     _subs.add(_ctrl.player.stream.tracks.listen((t) {
       if (!mounted) return;
       setState(() {
         _audioTracks = t.audio;
         _subtitleTracks = t.subtitle;
       });
+      _applyPreferredTracks(t);
     }));
     // Auto‑pasar al siguiente episodio al terminar (si hay cola).
     if (_hasNext) {
@@ -153,8 +206,104 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
         );
   }
 
+  // --- UI inmersiva y pantalla completa ---
+
+  /// Muestra la barra y reprograma su ocultado automático.
+  void _pokeUi() {
+    if (!_uiVisible) setState(() => _uiVisible = true);
+    _scheduleUiHide();
+  }
+
+  void _scheduleUiHide() {
+    _uiTimer?.cancel();
+    _uiTimer = Timer(const Duration(seconds: 3), () {
+      if (!mounted || !_ctrl.player.state.playing) return;
+      setState(() => _uiVisible = false);
+    });
+  }
+
+  void _toggleFullscreen() {
+    _fullscreen = !_fullscreen;
+    setWindowFullScreen(_fullscreen);
+    setState(() {});
+  }
+
+  // --- Pistas preferidas por idioma ---
+
+  /// Al conocer las pistas, elige el audio/subtítulos del idioma preferido
+  /// (una sola vez por apertura, para no pisar la elección manual).
+  void _applyPreferredTracks(Tracks t) {
+    if (_langsApplied) return;
+    final audios =
+        t.audio.where((a) => a.id != 'auto' && a.id != 'no').toList();
+    final subs =
+        t.subtitle.where((s) => s.id != 'auto' && s.id != 'no').toList();
+    if (audios.isEmpty && subs.isEmpty) return;
+    _langsApplied = true;
+    final aPref = ref.read(preferredAudioLangProvider);
+    if (aPref.isNotEmpty) {
+      for (final a in audios) {
+        if (langMatches(a.language, aPref) || langMatches(a.title, aPref)) {
+          _ctrl.player.setAudioTrack(a);
+          break;
+        }
+      }
+    }
+    final sPref = ref.read(preferredSubLangProvider);
+    if (sPref == 'off') {
+      if (subs.isNotEmpty) _ctrl.player.setSubtitleTrack(SubtitleTrack.no());
+    } else if (sPref.isNotEmpty) {
+      for (final s in subs) {
+        if (langMatches(s.language, sPref) || langMatches(s.title, sPref)) {
+          _ctrl.player.setSubtitleTrack(s);
+          break;
+        }
+      }
+    }
+  }
+
+  // --- Zapping tecleando el número de canal ---
+
+  void _numKey(int d) {
+    if (widget.queue == null || _numBuf.length >= 4) return;
+    setState(() => _numBuf += '$d');
+    _numTimer?.cancel();
+    _numTimer = Timer(const Duration(milliseconds: 1600), _commitNum);
+  }
+
+  void _commitNum() {
+    final n = int.tryParse(_numBuf);
+    if (mounted) setState(() => _numBuf = '');
+    final q = widget.queue;
+    if (n == null || q == null) return;
+    if (n >= 1 && n <= q.length && n - 1 != widget.queueIndex) _playAt(n - 1);
+  }
+
   // --- Atajos de teclado (escritorio) ---
   double? _mutedVolume;
+
+  static final _digitKeys = <LogicalKeyboardKey, int>{
+    LogicalKeyboardKey.digit0: 0,
+    LogicalKeyboardKey.digit1: 1,
+    LogicalKeyboardKey.digit2: 2,
+    LogicalKeyboardKey.digit3: 3,
+    LogicalKeyboardKey.digit4: 4,
+    LogicalKeyboardKey.digit5: 5,
+    LogicalKeyboardKey.digit6: 6,
+    LogicalKeyboardKey.digit7: 7,
+    LogicalKeyboardKey.digit8: 8,
+    LogicalKeyboardKey.digit9: 9,
+    LogicalKeyboardKey.numpad0: 0,
+    LogicalKeyboardKey.numpad1: 1,
+    LogicalKeyboardKey.numpad2: 2,
+    LogicalKeyboardKey.numpad3: 3,
+    LogicalKeyboardKey.numpad4: 4,
+    LogicalKeyboardKey.numpad5: 5,
+    LogicalKeyboardKey.numpad6: 6,
+    LogicalKeyboardKey.numpad7: 7,
+    LogicalKeyboardKey.numpad8: 8,
+    LogicalKeyboardKey.numpad9: 9,
+  };
 
   void _seekBy(int seconds) {
     final target = (_positionSeconds + seconds).clamp(0, _duration.inSeconds);
@@ -203,6 +352,17 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
       _playAt(widget.queueIndex + 1);
     } else if (k == LogicalKeyboardKey.pageUp && _hasPrev) {
       _playAt(widget.queueIndex - 1);
+    } else if (k == LogicalKeyboardKey.keyF) {
+      _toggleFullscreen();
+    } else if (k == LogicalKeyboardKey.escape && _fullscreen) {
+      _toggleFullscreen();
+    } else if (k == LogicalKeyboardKey.keyA) {
+      final next =
+          FitMode.values[(_fit.index + 1) % FitMode.values.length];
+      setState(() => _fit = next);
+      _pokeUi();
+    } else if (_digitKeys.containsKey(k) && widget.queue != null) {
+      _numKey(_digitKeys[k]!);
     } else {
       return KeyEventResult.ignored;
     }
@@ -366,6 +526,9 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
   void dispose() {
     _sleepTimer?.cancel();
     _osdTimer?.cancel();
+    _uiTimer?.cancel();
+    _numTimer?.cancel();
+    if (_fullscreen) setWindowFullScreen(false);
     // 1) Cortar el audio LO PRIMERO, pase lo que pase con el resto.
     final ctrl = _ctrl;
     ctrl.player.setVolume(0);
@@ -427,33 +590,168 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
         ],
       ));
     }
+    // Velocidad de reproducción (solo VOD; el directo va a 1x).
+    if (!_isLive) {
+      actions.add(PopupMenuButton<double>(
+        icon: const Icon(Icons.speed),
+        tooltip: 'Velocidad (${_rate}x)',
+        initialValue: _rate,
+        onSelected: (v) {
+          _ctrl.player.setRate(v);
+          setState(() => _rate = v);
+        },
+        itemBuilder: (_) => [
+          for (final v in const [0.5, 0.75, 1.0, 1.25, 1.5, 2.0])
+            CheckedPopupMenuItem(
+                value: v, checked: v == _rate, child: Text('${v}x')),
+        ],
+      ));
+    }
+    // Relación de aspecto / zoom.
+    actions.add(PopupMenuButton<FitMode>(
+      icon: const Icon(Icons.aspect_ratio),
+      tooltip: 'Aspecto: ${_fit.label} (A)',
+      initialValue: _fit,
+      onSelected: (f) => setState(() => _fit = f),
+      itemBuilder: (_) => [
+        for (final f in FitMode.values)
+          CheckedPopupMenuItem(
+              value: f, checked: f == _fit, child: Text(f.label)),
+      ],
+    ));
     return actions;
   }
 
-  Widget _helpButton(BuildContext context) => IconButton(
-        icon: const Icon(Icons.keyboard_outlined),
-        tooltip: 'Atajos de teclado',
-        onPressed: () => showDialog<void>(
-          context: context,
-          builder: (_) => AlertDialog(
-            title: const Text('Atajos de teclado'),
-            content: const Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('Espacio / K — Reproducir · Pausa'),
-                Text('← / → (J / L) — Retroceder · Avanzar 10 s'),
-                Text('↑ / ↓ — Subir · Bajar volumen'),
-                Text('M — Silenciar'),
-                Text('N — Siguiente episodio'),
-                Text('Re Pág / Av Pág — Canal · Episodio anterior / siguiente'),
+  /// Diálogo con la información técnica del stream (resolución, códecs...).
+  Future<void> _showStats() async {
+    final info = await _ctrl.streamInfo();
+    if (!mounted) return;
+    showDialog<void>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Información del stream'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            for (final e in info.entries)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 6),
+                child: Row(
+                  children: [
+                    SizedBox(
+                        width: 150,
+                        child: Text(e.key,
+                            style: const TextStyle(color: Colors.white54))),
+                    Expanded(child: Text(e.value)),
+                  ],
+                ),
+              ),
+          ],
+        ),
+        actions: [
+          FilledButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cerrar')),
+        ],
+      ),
+    );
+  }
+
+  void _showHelp() => showDialog<void>(
+        context: context,
+        builder: (_) => AlertDialog(
+          title: const Text('Atajos de teclado'),
+          content: const Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Espacio / K — Reproducir · Pausa'),
+              Text('← / → (J / L) — Retroceder · Avanzar 10 s'),
+              Text('↑ / ↓ — Subir · Bajar volumen'),
+              Text('M — Silenciar'),
+              Text('N — Siguiente episodio'),
+              Text('Re Pág / Av Pág — Canal · Episodio anterior / siguiente'),
+              Text('0-9 — Ir al canal por número'),
+              Text('F / doble clic — Pantalla completa'),
+              Text('A — Cambiar aspecto/zoom'),
+            ],
+          ),
+          actions: [
+            FilledButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Entendido')),
+          ],
+        ),
+      );
+
+  /// Menú de desbordamiento: info del stream y atajos.
+  Widget _moreMenu() => PopupMenuButton<String>(
+        tooltip: 'Más opciones',
+        onSelected: (v) => v == 'stats' ? _showStats() : _showHelp(),
+        itemBuilder: (_) => const [
+          PopupMenuItem(
+              value: 'stats',
+              child: ListTile(
+                  leading: Icon(Icons.monitor_heart_outlined),
+                  title: Text('Información del stream'))),
+          PopupMenuItem(
+              value: 'ayuda',
+              child: ListTile(
+                  leading: Icon(Icons.keyboard_outlined),
+                  title: Text('Atajos de teclado'))),
+        ],
+      );
+
+  /// El vídeo con el modo de aspecto/zoom elegido.
+  Widget _videoView() => switch (_fit) {
+        FitMode.auto =>
+          Center(child: Video(controller: _video, fit: BoxFit.contain)),
+        FitMode.stretch =>
+          Center(child: Video(controller: _video, fit: BoxFit.fill)),
+        FitMode.crop =>
+          Center(child: Video(controller: _video, fit: BoxFit.cover)),
+        FitMode.ratio169 => Center(
+            child: AspectRatio(
+                aspectRatio: 16 / 9,
+                child: Video(controller: _video, fit: BoxFit.fill))),
+        FitMode.ratio43 => Center(
+            child: AspectRatio(
+                aspectRatio: 4 / 3,
+                child: Video(controller: _video, fit: BoxFit.fill))),
+      };
+
+  /// Barra superior que se desvanece durante la reproducción (UI inmersiva).
+  PreferredSizeWidget _appBar() => PreferredSize(
+        preferredSize: const Size.fromHeight(kToolbarHeight),
+        child: AnimatedOpacity(
+          opacity: _uiVisible ? 1 : 0,
+          duration: const Duration(milliseconds: 250),
+          child: IgnorePointer(
+            ignoring: !_uiVisible,
+            child: AppBar(
+              backgroundColor: Colors.black.withValues(alpha: 0.55),
+              leading: widget.viewerWindow
+                  ? IconButton(
+                      icon: const Icon(Icons.close),
+                      tooltip: 'Cerrar ventana',
+                      onPressed: () => exit(0),
+                    )
+                  : null,
+              title: Text(widget.item.name),
+              actions: [
+                ..._trackActions(),
+                _sleepButton(),
+                IconButton(
+                  icon: Icon(_fullscreen
+                      ? Icons.fullscreen_exit
+                      : Icons.fullscreen),
+                  tooltip: 'Pantalla completa (F / doble clic)',
+                  onPressed: _toggleFullscreen,
+                ),
+                _moreMenu(),
               ],
             ),
-            actions: [
-              FilledButton(
-                  onPressed: () => Navigator.pop(context),
-                  child: const Text('Entendido')),
-            ],
           ),
         ),
       );
@@ -461,39 +759,57 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-          leading: widget.viewerWindow
-              ? IconButton(
-                  icon: const Icon(Icons.close),
-                  tooltip: 'Cerrar ventana',
-                  onPressed: () => exit(0),
-                )
-              : null,
-          title: Text(widget.item.name),
-          actions: [..._trackActions(), _sleepButton(), _helpButton(context)]),
+      extendBodyBehindAppBar: true,
+      appBar: _appBar(),
       backgroundColor: Colors.black,
       body: Focus(
         autofocus: true,
         onKeyEvent: _onKey,
-        child: Stack(
-          children: [
-            Center(
-              child: Video(controller: _video, fit: BoxFit.contain),
-            ),
-            // OSD de canal (nombre + programa actual), se desvanece solo.
-            if (_isLive)
-              Positioned(
-                left: 16,
-                bottom: 16,
-                child: IgnorePointer(
-                  child: AnimatedOpacity(
-                    opacity: _osdVisible ? 1 : 0,
-                    duration: const Duration(milliseconds: 350),
-                    child: _osd(),
+        child: MouseRegion(
+          cursor: _uiVisible ? MouseCursor.defer : SystemMouseCursors.none,
+          onHover: (_) => _pokeUi(),
+          child: GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: _pokeUi,
+            onDoubleTap: _toggleFullscreen,
+            child: Stack(
+              children: [
+                _videoView(),
+                // OSD de canal (nombre + programa actual), se desvanece solo.
+                if (_isLive)
+                  Positioned(
+                    left: 16,
+                    bottom: 16,
+                    child: IgnorePointer(
+                      child: AnimatedOpacity(
+                        opacity: _osdVisible ? 1 : 0,
+                        duration: const Duration(milliseconds: 350),
+                        child: _osd(),
+                      ),
+                    ),
                   ),
-                ),
-              ),
-          ],
+                // Número de canal que se está tecleando.
+                if (_numBuf.isNotEmpty)
+                  Positioned(
+                    top: kToolbarHeight + 20,
+                    right: 20,
+                    child: IgnorePointer(
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 18, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: Colors.black.withValues(alpha: 0.72),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Text(_numBuf,
+                            style: const TextStyle(
+                                fontSize: 34, fontWeight: FontWeight.w800)),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
         ),
       ),
     );

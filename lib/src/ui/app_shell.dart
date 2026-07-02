@@ -1,7 +1,11 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../app/providers.dart';
+import '../domain/content_type.dart';
+import '../domain/media_item.dart';
 import 'home_tab.dart';
+import 'player_screen.dart';
 import 'live_tab.dart';
 import 'movies_tab.dart';
 import 'series_tab.dart';
@@ -36,7 +40,45 @@ class _AppShellState extends ConsumerState<AppShell> {
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) => _autoRefresh());
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _startupChannel();
+      _autoRefresh();
+    });
+  }
+
+  /// Si está activado "arrancar en el último canal", lo abre directamente
+  /// (con su categoría como cola de zapping si sigue existiendo).
+  Future<void> _startupChannel() async {
+    if (!ref.read(startLastChannelProvider)) return;
+    final raw = ref.read(sharedPrefsProvider).getString('last_channel');
+    if (raw == null) return;
+    try {
+      final m = jsonDecode(raw) as Map<String, dynamic>;
+      final url = '${m['url']}';
+      if (url.isEmpty) return;
+      final group = m['group'];
+      List<MediaItem>? queue;
+      if (group is String) {
+        queue = await ref.read(liveByCategoryProvider(group).future);
+      }
+      final idx = queue?.indexWhere((e) => e.streamUrl == url) ?? -1;
+      if (!mounted) return;
+      await Navigator.of(context).push(MaterialPageRoute(
+        builder: (_) => PlayerScreen(
+          item: idx >= 0
+              ? queue![idx]
+              : MediaItem(
+                  id: 'last:$url',
+                  name: '${m['name']}',
+                  streamUrl: url,
+                  groupTitle: group is String ? group : null,
+                  type: ContentType.live,
+                ),
+          queue: idx >= 0 ? queue : null,
+          queueIndex: idx >= 0 ? idx : 0,
+        ),
+      ));
+    } catch (_) {}
   }
 
   /// Recarga la lista activa en segundo plano al arrancar (si el ajuste está

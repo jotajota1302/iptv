@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'src/app/desktop_window.dart';
 import 'src/app/providers.dart';
 import 'src/app/theme.dart';
 import 'src/app/viewer_args.dart';
@@ -25,6 +26,7 @@ class AppScrollBehavior extends MaterialScrollBehavior {
 Future<void> main(List<String> args) async {
   WidgetsFlutterBinding.ensureInitialized();
   MediaKit.ensureInitialized();
+  await initDesktopWindow();
   final prefs = await SharedPreferences.getInstance();
   // Color de acento elegido, antes de construir el tema.
   kAccent = kAccentChoices[(prefs.getInt('accent_color') ?? 0)

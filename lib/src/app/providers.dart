@@ -131,6 +131,35 @@ void setAutoRefresh(WidgetRef ref, bool value) {
   ref.read(sharedPrefsProvider).setBool('auto_refresh', value);
 }
 
+/// Idioma de audio preferido ('' = automático). El reproductor elige la pista
+/// de este idioma al abrir el contenido, si existe. Persistido.
+final preferredAudioLangProvider = StateProvider<String>(
+    (ref) => ref.watch(sharedPrefsProvider).getString('pref_audio_lang') ?? '');
+
+void setPreferredAudioLang(WidgetRef ref, String value) {
+  ref.read(preferredAudioLangProvider.notifier).state = value;
+  ref.read(sharedPrefsProvider).setString('pref_audio_lang', value);
+}
+
+/// Subtítulos preferidos: '' = automático (no tocar), 'off' = desactivados
+/// siempre, o un código de idioma. Persistido.
+final preferredSubLangProvider = StateProvider<String>(
+    (ref) => ref.watch(sharedPrefsProvider).getString('pref_sub_lang') ?? '');
+
+void setPreferredSubLang(WidgetRef ref, String value) {
+  ref.read(preferredSubLangProvider.notifier).state = value;
+  ref.read(sharedPrefsProvider).setString('pref_sub_lang', value);
+}
+
+/// Arrancar la app directamente en el último canal visto. Persistido.
+final startLastChannelProvider = StateProvider<bool>((ref) =>
+    ref.watch(sharedPrefsProvider).getBool('start_last_channel') ?? false);
+
+void setStartLastChannel(WidgetRef ref, bool value) {
+  ref.read(startLastChannelProvider.notifier).state = value;
+  ref.read(sharedPrefsProvider).setBool('start_last_channel', value);
+}
+
 const _kHwAccel = 'hardware_accel';
 const _kDeinterlace = 'deinterlace';
 

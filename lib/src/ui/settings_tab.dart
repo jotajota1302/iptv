@@ -7,6 +7,7 @@ import '../app/providers.dart';
 import '../app/theme.dart';
 import '../data/backup_service.dart';
 import '../domain/content_type.dart';
+import '../domain/lang_match.dart';
 import '../domain/saved_playlist.dart';
 import 'management_screen.dart';
 
@@ -216,6 +217,44 @@ class _SettingsTabState extends ConsumerState<SettingsTab> {
     } catch (e) {
       _toast('No se pudo importar: $e');
     }
+  }
+
+  String _langLabel(String code) {
+    if (code == 'off') return 'Desactivados siempre';
+    for (final o in kPreferredLangs) {
+      if (o.$1 == code) return o.$2;
+    }
+    return 'Automático';
+  }
+
+  /// Diálogo para elegir un idioma preferido (audio o subtítulos).
+  Future<void> _pickLang({
+    required String title,
+    required String current,
+    required void Function(String) onPicked,
+    bool withOff = false,
+  }) async {
+    final options = [
+      ...kPreferredLangs,
+      if (withOff) ('off', 'Desactivados siempre'),
+    ];
+    final v = await showDialog<String>(
+      context: context,
+      builder: (ctx) => SimpleDialog(
+        title: Text(title),
+        children: [
+          for (final o in options)
+            ListTile(
+              leading: Icon(o.$1 == current
+                  ? Icons.radio_button_checked
+                  : Icons.radio_button_unchecked),
+              title: Text(o.$2),
+              onTap: () => Navigator.pop(ctx, o.$1),
+            ),
+        ],
+      ),
+    );
+    if (v != null) onPicked(v);
   }
 
   /// Cambia el control parental. Al desactivarlo, si hay PIN, lo pide.
@@ -469,6 +508,38 @@ class _SettingsTabState extends ConsumerState<SettingsTab> {
               'canal no funciona y quieres probar sus copias.'),
           value: ref.watch(hideDuplicatesProvider),
           onChanged: (v) => setHideDuplicates(ref, v),
+        ),
+        SwitchListTile(
+          contentPadding: EdgeInsets.zero,
+          title: const Text('Arrancar en el último canal'),
+          subtitle: const Text(
+              'Al abrir la app, reproduce directamente el último canal de TV '
+              'que estabas viendo.'),
+          value: ref.watch(startLastChannelProvider),
+          onChanged: (v) => setStartLastChannel(ref, v),
+        ),
+        ListTile(
+          contentPadding: EdgeInsets.zero,
+          leading: const Icon(Icons.multitrack_audio),
+          title: const Text('Idioma de audio preferido'),
+          subtitle: Text(_langLabel(ref.watch(preferredAudioLangProvider))),
+          onTap: () => _pickLang(
+            title: 'Idioma de audio preferido',
+            current: ref.read(preferredAudioLangProvider),
+            onPicked: (v) => setPreferredAudioLang(ref, v),
+          ),
+        ),
+        ListTile(
+          contentPadding: EdgeInsets.zero,
+          leading: const Icon(Icons.subtitles_outlined),
+          title: const Text('Subtítulos preferidos'),
+          subtitle: Text(_langLabel(ref.watch(preferredSubLangProvider))),
+          onTap: () => _pickLang(
+            title: 'Subtítulos preferidos',
+            current: ref.read(preferredSubLangProvider),
+            withOff: true,
+            onPicked: (v) => setPreferredSubLang(ref, v),
+          ),
         ),
 
         const SizedBox(height: 24),

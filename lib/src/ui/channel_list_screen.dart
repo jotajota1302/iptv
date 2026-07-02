@@ -350,7 +350,20 @@ class _ChannelListScreenState extends ConsumerState<ChannelListScreen> {
         final it = items[i];
         return ListTile(
           selected: _selected?.id == it.id,
-          leading: _logo(it),
+          // Número de canal: coincide con el zapping por número (teclas 0-9).
+          leading: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              SizedBox(
+                width: 30,
+                child: Text('${i + 1}',
+                    textAlign: TextAlign.center,
+                    style:
+                        const TextStyle(fontSize: 12, color: Colors.white38)),
+              ),
+              _logo(it),
+            ],
+          ),
           title: Text(it.name),
           trailing: Row(
             mainAxisSize: MainAxisSize.min,

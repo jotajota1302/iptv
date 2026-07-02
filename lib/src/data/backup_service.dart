@@ -16,6 +16,10 @@ const kBackupPrefsKeys = <String>[
   'accent_color',
   'auto_refresh',
   'hide_duplicates',
+  'pref_audio_lang',
+  'pref_sub_lang',
+  'start_last_channel',
+  'last_channel',
 ];
 
 /// Construye el JSON de la copia de seguridad: ajustes (prefs) + flags de
