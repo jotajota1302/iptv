@@ -23,6 +23,14 @@ class Brand {
 
   /// Acento de la marca, o null para usar el violeta por defecto.
   static Color? get accent => parseHexColor(_accentHex);
+
+  /// Feed de actualizaciones (formato API de GitHub Releases). Un white-label
+  /// puede apuntar a su propio endpoint o desactivarlo con UPDATE_FEED=off.
+  static const _feed = String.fromEnvironment('UPDATE_FEED',
+      defaultValue:
+          'https://api.github.com/repos/jotajota1302/iptv/releases?per_page=10');
+
+  static String get updateFeed => _feed == 'off' ? '' : _feed;
 }
 
 /// 'FF00A5FF', '00A5FF' o '#00A5FF' → Color (ARGB). Null si no parsea.

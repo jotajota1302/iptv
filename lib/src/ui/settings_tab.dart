@@ -3,10 +3,12 @@ import 'dart:io';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../app/brand.dart';
 import '../app/providers.dart';
 import '../app/theme.dart';
 import '../data/backup_service.dart';
+import '../data/update_service.dart';
 import '../domain/xtream_login.dart';
 import '../domain/content_type.dart';
 import '../domain/lang_match.dart';
@@ -58,6 +60,53 @@ class _SettingsTabState extends ConsumerState<SettingsTab> {
     }
     _passCtrl.clear();
     await _run(() => ref.read(playlistRepositoryProvider).loadFromUrl(url));
+  }
+
+  /// Comprobación manual de actualizaciones, con resultado siempre visible
+  /// (a diferencia del chequeo silencioso del arranque).
+  Future<void> _checkUpdates() async {
+    final messenger = ScaffoldMessenger.of(context);
+    UpdateInfo? info;
+    try {
+      final current = await ref.read(appVersionProvider.future);
+      info = await ref.read(updateServiceProvider).check(current);
+    } catch (_) {
+      messenger.showSnackBar(const SnackBar(
+          content: Text('No se pudo comprobar (¿sin conexión?)')));
+      return;
+    }
+    if (!mounted) return;
+    if (info == null) {
+      messenger.showSnackBar(
+          const SnackBar(content: Text('Estás en la última versión')));
+      return;
+    }
+    final update = info;
+    await showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('Versión ${update.version} disponible'),
+        content: update.notes == null || update.notes!.trim().isEmpty
+            ? const Text('Hay una versión más nueva lista para descargar.')
+            : SingleChildScrollView(
+                child: Text(update.notes!,
+                    style: const TextStyle(height: 1.4))),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Más tarde')),
+          FilledButton.icon(
+            icon: const Icon(Icons.download),
+            label: const Text('Descargar'),
+            onPressed: () {
+              launchUrl(Uri.parse(update.url),
+                  mode: LaunchMode.externalApplication);
+              Navigator.pop(ctx);
+            },
+          ),
+        ],
+      ),
+    );
   }
 
   Future<void> _run(Future<int> Function() action) async {
@@ -693,12 +742,22 @@ class _SettingsTabState extends ConsumerState<SettingsTab> {
         const Divider(),
         const Text('Acerca de', style: TextStyle(fontSize: 20)),
         const SizedBox(height: 8),
-        const ListTile(
+        ListTile(
           contentPadding: EdgeInsets.zero,
-          leading: Icon(Icons.live_tv),
-          title: Text(Brand.name),
-          subtitle: Text('Versión 1.0.0 · Flutter + media_kit'),
+          leading: const Icon(Icons.live_tv),
+          title: const Text(Brand.name),
+          subtitle: Text(
+              'Versión ${ref.watch(appVersionProvider).value ?? '…'}'
+              ' · Flutter + media_kit'),
         ),
+        if (Brand.updateFeed.isNotEmpty)
+          ListTile(
+            contentPadding: EdgeInsets.zero,
+            leading: const Icon(Icons.system_update_alt),
+            title: const Text('Buscar actualizaciones'),
+            subtitle: const Text('Comprueba si hay una versión más nueva.'),
+            onTap: _checkUpdates,
+          ),
         if (!Brand.isWhiteLabel)
           const ListTile(
             contentPadding: EdgeInsets.zero,

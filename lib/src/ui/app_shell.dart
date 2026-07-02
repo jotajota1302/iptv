@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../app/providers.dart';
 import '../domain/content_type.dart';
 import '../domain/media_item.dart';
@@ -48,6 +49,7 @@ class _AppShellState extends ConsumerState<AppShell> {
       ref.read(remindersProvider.notifier).prunePast();
       _startupChannel();
       _autoRefresh();
+      _checkUpdate();
     });
     _reminderTimer = Timer.periodic(
         const Duration(seconds: 20), (_) => _checkReminders());
@@ -138,6 +140,37 @@ class _AppShellState extends ConsumerState<AppShell> {
         ),
       ));
     } catch (_) {}
+  }
+
+  /// Aviso discreto si hay una versión nueva publicada. Se puede omitir por
+  /// versión (no vuelve a molestar hasta la siguiente).
+  Future<void> _checkUpdate() async {
+    final info = await ref.read(updateInfoProvider.future);
+    if (info == null || !mounted) return;
+    final prefs = ref.read(sharedPrefsProvider);
+    if (prefs.getString('skipped_update_version') == info.version) return;
+    final messenger = ScaffoldMessenger.of(context);
+    messenger.showMaterialBanner(MaterialBanner(
+      leading: const Icon(Icons.system_update_alt),
+      content: Text('Hay una versión nueva disponible (${info.version}).'),
+      actions: [
+        TextButton(
+          onPressed: () {
+            prefs.setString('skipped_update_version', info.version);
+            messenger.hideCurrentMaterialBanner();
+          },
+          child: const Text('Omitir'),
+        ),
+        FilledButton(
+          onPressed: () {
+            launchUrl(Uri.parse(info.url),
+                mode: LaunchMode.externalApplication);
+            messenger.hideCurrentMaterialBanner();
+          },
+          child: const Text('Descargar'),
+        ),
+      ],
+    ));
   }
 
   /// Recarga la lista activa en segundo plano al arrancar (si el ajuste está

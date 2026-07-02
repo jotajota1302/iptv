@@ -1,6 +1,8 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/legacy.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'brand.dart';
 import 'fav_groups_controller.dart';
 import 'playlists_controller.dart';
 import 'reminders_controller.dart';
@@ -10,6 +12,7 @@ import '../data/m3u_source.dart';
 import '../data/playlist_repository.dart';
 import '../data/account_service.dart';
 import '../data/series_grouper.dart';
+import '../data/update_service.dart';
 import '../data/series_info_service.dart';
 import '../data/vod_info_service.dart';
 import '../data/xmltv_service.dart';
@@ -120,6 +123,24 @@ final accountServiceProvider = Provider<AccountService>((_) => AccountService())
 final accountInfoProvider =
     FutureProvider.family<AccountInfo?, String>((ref, listUrl) {
   return ref.watch(accountServiceProvider).fetch(listUrl);
+});
+
+/// Versión instalada (del ejecutable compilado; única fuente: pubspec.yaml).
+final appVersionProvider = FutureProvider<String>(
+    (ref) async => (await PackageInfo.fromPlatform()).version);
+
+final updateServiceProvider =
+    Provider((ref) => UpdateService(feedUrl: Brand.updateFeed));
+
+/// Versión nueva disponible, o null (al día, feed desactivado o sin red).
+/// Silencioso: los errores de red no se propagan.
+final updateInfoProvider = FutureProvider<UpdateInfo?>((ref) async {
+  try {
+    final current = await ref.watch(appVersionProvider.future);
+    return await ref.watch(updateServiceProvider).check(current);
+  } catch (_) {
+    return null;
+  }
 });
 
 /// URL de la lista actualmente cargada, reconstruida desde la BD (para
