@@ -90,16 +90,17 @@ class _ChannelListScreenState extends ConsumerState<ChannelListScreen> {
       );
 
   Widget _logo(MediaItem it, {double size = 48}) {
-    final fallback =
-        Icon(Icons.live_tv, size: size * 0.5, color: Colors.white24);
+    // Plato claro: los logos de TV suelen ser oscuros sobre transparente, así
+    // que sobre blanco se ven mucho mejor. Con margen y esquinas redondeadas
+    // para un acabado limpio.
+    final fallback = Icon(Icons.live_tv, size: size * 0.5, color: Colors.black38);
     return Container(
       width: size,
       height: size,
-      padding: const EdgeInsets.all(6),
+      padding: EdgeInsets.all(size * 0.14),
       decoration: BoxDecoration(
-        color: const Color(0xFF20222B),
+        color: const Color(0xFFF7F8FA),
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: Colors.white10),
       ),
       child: it.logoUrl == null
           ? fallback
