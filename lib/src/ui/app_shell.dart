@@ -8,9 +8,14 @@ import 'series_tab.dart';
 import 'search_tab.dart';
 import 'settings_tab.dart';
 
-class AppShell extends ConsumerWidget {
+class AppShell extends ConsumerStatefulWidget {
   const AppShell({super.key});
 
+  @override
+  ConsumerState<AppShell> createState() => _AppShellState();
+}
+
+class _AppShellState extends ConsumerState<AppShell> {
   static const _tabs = [
     HomeTab(),
     LiveTab(),
@@ -29,7 +34,32 @@ class AppShell extends ConsumerWidget {
   ];
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _autoRefresh());
+  }
+
+  /// Recarga la lista activa en segundo plano al arrancar (si el ajuste está
+  /// activo). Silencioso: sin red se sigue usando el contenido ya cargado.
+  Future<void> _autoRefresh() async {
+    if (!ref.read(autoRefreshProvider)) return;
+    final active = ref.read(playlistsProvider).active;
+    if (active == null) return;
+    try {
+      await ref.read(playlistRepositoryProvider).loadFromUrl(active.url);
+      if (!mounted) return;
+      ref.invalidate(liveCategoriesProvider);
+      ref.invalidate(movieCategoriesProvider);
+      ref.invalidate(seriesCategoriesProvider);
+      ref.invalidate(recentMoviesProvider);
+      ref.invalidate(recentSeriesProvider);
+      ref.invalidate(continueWatchingProvider);
+      ref.invalidate(favoritesProvider);
+    } catch (_) {}
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final index = ref.watch(selectedTabProvider);
     void select(int i) => ref.read(selectedTabProvider.notifier).state = i;
     final wide = MediaQuery.of(context).size.width >= 600;

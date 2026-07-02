@@ -558,7 +558,7 @@ class _ChannelCardState extends State<_ChannelCard> {
                 ],
               ),
               if (widget.favorite)
-                const Positioned(
+                Positioned(
                   top: 6,
                   left: 6,
                   child: Icon(Icons.favorite, size: 14, color: kAccent),

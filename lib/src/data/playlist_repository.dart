@@ -41,6 +41,19 @@ class PlaylistRepository {
         .toList();
   }
 
+  /// Hasta [max] logos por categoría en directo (collage de las tarjetas).
+  Future<Map<String, List<String>>> liveLogosByCategory({int max = 3}) async {
+    final all = await _db.itemsByType(ContentType.live);
+    final out = <String, List<String>>{};
+    for (final it in all) {
+      final logo = it.logoUrl;
+      if (logo == null || logo.isEmpty) continue;
+      final list = out.putIfAbsent(it.groupTitle ?? 'Sin categoria', () => []);
+      if (list.length < max) list.add(logo);
+    }
+    return out;
+  }
+
   Future<List<MediaItem>> search(String q) => _db.search(q);
 
   Future<List<MediaItem>> favorites() => _db.favorites();
@@ -147,4 +160,13 @@ class PlaylistRepository {
         .where((i) => (i.groupTitle ?? 'Sin categoria') == group)
         .toList();
   }
+
+  // --- Copia de seguridad ---
+
+  /// Flags de usuario (favoritos, ocultos y progreso) para exportar.
+  Future<Map<String, dynamic>> exportUserFlags() => _db.exportUserFlags();
+
+  /// Aplica flags importados; devuelve cuántos items se han actualizado.
+  Future<int> importUserFlags(Map<String, dynamic> flags) =>
+      _db.importUserFlags(flags);
 }

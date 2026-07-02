@@ -1,7 +1,20 @@
 import 'package:flutter/material.dart';
 
-/// Paleta y tema de la app. Cambiar [kAccent] recolorea toda la interfaz.
-const Color kAccent = Color(0xFF7C4DFF); // violeta cinematográfico
+/// Acentos disponibles (nombre + color). El elegido se persiste en prefs y
+/// se aplica a [kAccent] al arrancar y al cambiarlo en Ajustes.
+const kAccentChoices = <(String, Color)>[
+  ('Violeta', Color(0xFF7C4DFF)),
+  ('Azul', Color(0xFF448AFF)),
+  ('Cian', Color(0xFF00BCD4)),
+  ('Verde', Color(0xFF43D17A)),
+  ('Ámbar', Color(0xFFFFB300)),
+  ('Rojo', Color(0xFFFF5252)),
+];
+
+/// Paleta y tema de la app. Cambiar [kAccent] (+ reconstruir MaterialApp)
+/// recolorea toda la interfaz. Mutable a propósito: lo fija el selector de
+/// acento; el resto del código lo trata como constante de solo lectura.
+Color kAccent = const Color(0xFF7C4DFF); // violeta cinematográfico
 const Color kBackground = Color(0xFF0D0E12); // casi negro (AMOLED-friendly)
 const Color kSurface = Color(0xFF15161C);
 const Color kSurfaceHigh = Color(0xFF1E2029);
@@ -63,7 +76,7 @@ ThemeData buildAppTheme() {
     navigationRailTheme: NavigationRailThemeData(
       backgroundColor: const Color(0xFF101119),
       indicatorColor: kAccent.withValues(alpha: 0.22),
-      selectedIconTheme: const IconThemeData(color: kAccent),
+      selectedIconTheme: IconThemeData(color: kAccent),
       selectedLabelTextStyle:
           const TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
       unselectedLabelTextStyle: const TextStyle(color: Colors.white60),

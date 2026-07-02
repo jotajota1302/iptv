@@ -80,11 +80,11 @@ class ChannelGuideScreen extends ConsumerWidget {
               subtitle: onNow
                   ? const Text('En emisión ahora')
                   : (canCatchup
-                      ? const Text('Disponible en archivo',
+                      ? Text('Disponible en archivo',
                           style: TextStyle(color: kAccent))
                       : null),
               trailing: canCatchup
-                  ? const Icon(Icons.replay, color: kAccent)
+                  ? Icon(Icons.replay, color: kAccent)
                   : null,
               tileColor: onNow
                   ? Theme.of(context).colorScheme.primaryContainer

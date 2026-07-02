@@ -1,3 +1,4 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../app/providers.dart';
@@ -90,6 +91,35 @@ class LiveTab extends ConsumerWidget {
     );
   }
 
+  /// Mini-collage con los primeros logos de la categoría; si no hay logos,
+  /// vuelve al icono genérico de TV.
+  Widget _collage(WidgetRef ref, Category cat) {
+    final logos =
+        ref.watch(liveCategoryLogosProvider).value?[cat.name] ?? const [];
+    if (logos.isEmpty) return const Icon(Icons.live_tv, size: 28);
+    return Row(
+      children: [
+        for (final url in logos)
+          Container(
+            width: 30,
+            height: 30,
+            margin: const EdgeInsets.only(right: 5),
+            padding: const EdgeInsets.all(4),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF7F8FA),
+              borderRadius: BorderRadius.circular(7),
+            ),
+            child: CachedNetworkImage(
+              imageUrl: url,
+              fit: BoxFit.contain,
+              errorWidget: (_, _, _) =>
+                  const Icon(Icons.live_tv, size: 14, color: Colors.black26),
+            ),
+          ),
+      ],
+    );
+  }
+
   Widget _buildGrid(BuildContext context, WidgetRef ref, List<Category> cats) {
     return GridView.builder(
       padding: const EdgeInsets.all(8),
@@ -113,8 +143,7 @@ class LiveTab extends ConsumerWidget {
                 children: [
                   Row(
                     children: [
-                      const Icon(Icons.live_tv, size: 28),
-                      const Spacer(),
+                      Expanded(child: _collage(ref, cat)),
                       _menu(ref, cat),
                     ],
                   ),

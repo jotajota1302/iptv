@@ -1,7 +1,11 @@
+import 'dart:convert';
+import 'dart:io';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../app/providers.dart';
+import '../app/theme.dart';
+import '../data/backup_service.dart';
 import '../domain/content_type.dart';
 import '../domain/saved_playlist.dart';
 import 'management_screen.dart';
@@ -144,6 +148,76 @@ class _SettingsTabState extends ConsumerState<SettingsTab> {
     );
   }
 
+  void _toast(String msg) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+  }
+
+  /// Exporta ajustes + favoritos/progreso a un JSON elegido por el usuario.
+  Future<void> _exportBackup() async {
+    try {
+      final flags =
+          await ref.read(playlistRepositoryProvider).exportUserFlags();
+      final backup = buildBackup(ref.read(sharedPrefsProvider), flags);
+      final path = await FilePicker.platform.saveFile(
+        dialogTitle: 'Guardar copia de seguridad',
+        fileName: 'iptv_backup.json',
+        type: FileType.custom,
+        allowedExtensions: const ['json'],
+      );
+      if (path == null) return;
+      await File(path).writeAsString(
+          const JsonEncoder.withIndent('  ').convert(backup));
+      _toast('Copia guardada en $path');
+    } catch (e) {
+      _toast('No se pudo exportar: $e');
+    }
+  }
+
+  /// Importa un JSON de copia: restaura prefs y flags, y refresca la app.
+  Future<void> _importBackup() async {
+    try {
+      final res = await FilePicker.platform.pickFiles(
+          type: FileType.custom, allowedExtensions: const ['json']);
+      final path = res?.files.single.path;
+      if (path == null) return;
+      final json = jsonDecode(await File(path).readAsString());
+      if (json is! Map<String, dynamic> || !isValidBackup(json)) {
+        _toast('Ese archivo no es una copia de seguridad válida');
+        return;
+      }
+      final prefs = ref.read(sharedPrefsProvider);
+      await restorePrefs(prefs, json);
+      final applied = await ref
+          .read(playlistRepositoryProvider)
+          .importUserFlags((json['flags'] as Map).cast<String, dynamic>());
+      // Refresca acento y providers que se construyen desde prefs o BD.
+      kAccent = kAccentChoices[(prefs.getInt('accent_color') ?? 0)
+              .clamp(0, kAccentChoices.length - 1)]
+          .$2;
+      ref.invalidate(accentIndexProvider);
+      ref.invalidate(playlistsProvider);
+      ref.invalidate(parentalHideProvider);
+      ref.invalidate(parentalPinProvider);
+      ref.invalidate(hardwareAccelProvider);
+      ref.invalidate(deinterlaceProvider);
+      ref.invalidate(sortModeProvider);
+      ref.invalidate(channelGridProvider);
+      ref.invalidate(categoryGridProvider);
+      ref.invalidate(channelTileSizeProvider);
+      ref.invalidate(autoRefreshProvider);
+      ref.invalidate(favoritesProvider);
+      ref.invalidate(continueWatchingProvider);
+      ref.invalidate(liveCategoriesProvider);
+      ref.invalidate(movieCategoriesProvider);
+      ref.invalidate(seriesCategoriesProvider);
+      ref.invalidate(nowOnFavoritesProvider);
+      _toast('Copia restaurada ($applied elementos actualizados)');
+    } catch (e) {
+      _toast('No se pudo importar: $e');
+    }
+  }
+
   /// Cambia el control parental. Al desactivarlo, si hay PIN, lo pide.
   Future<void> _toggleParental(bool value) async {
     final pin = ref.read(parentalPinProvider);
@@ -281,6 +355,15 @@ class _SettingsTabState extends ConsumerState<SettingsTab> {
               ],
             ),
           ),
+        SwitchListTile(
+          contentPadding: EdgeInsets.zero,
+          title: const Text('Actualizar lista al iniciar'),
+          subtitle: const Text(
+              'Recarga la lista activa en segundo plano al abrir la app '
+              '(novedades y canales nuevos sin hacer nada).'),
+          value: ref.watch(autoRefreshProvider),
+          onChanged: (v) => setAutoRefresh(ref, v),
+        ),
         const SizedBox(height: 20),
         const Divider(),
 
@@ -399,6 +482,62 @@ class _SettingsTabState extends ConsumerState<SettingsTab> {
           subtitle: const Text(
               'Opcional: exige PIN para volver a mostrar el contenido +18.'),
           onTap: _changePin,
+        ),
+
+        const SizedBox(height: 24),
+        const Divider(),
+        const Text('Apariencia', style: TextStyle(fontSize: 20)),
+        const SizedBox(height: 6),
+        const Text('Color de acento',
+            style: TextStyle(fontSize: 13, color: Colors.white54)),
+        const SizedBox(height: 10),
+        Wrap(
+          spacing: 12,
+          children: [
+            for (var i = 0; i < kAccentChoices.length; i++)
+              Tooltip(
+                message: kAccentChoices[i].$1,
+                child: InkWell(
+                  customBorder: const CircleBorder(),
+                  onTap: () => setAccentIndex(ref, i),
+                  child: Container(
+                    width: 36,
+                    height: 36,
+                    decoration: BoxDecoration(
+                      color: kAccentChoices[i].$2,
+                      shape: BoxShape.circle,
+                      border: ref.watch(accentIndexProvider) == i
+                          ? Border.all(color: Colors.white, width: 2.5)
+                          : null,
+                    ),
+                    child: ref.watch(accentIndexProvider) == i
+                        ? const Icon(Icons.check,
+                            size: 18, color: Colors.white)
+                        : null,
+                  ),
+                ),
+              ),
+          ],
+        ),
+
+        const SizedBox(height: 24),
+        const Divider(),
+        const Text('Copia de seguridad', style: TextStyle(fontSize: 20)),
+        ListTile(
+          contentPadding: EdgeInsets.zero,
+          leading: const Icon(Icons.upload_file),
+          title: const Text('Exportar'),
+          subtitle: const Text(
+              'Guarda listas, favoritos, progreso y ajustes en un archivo.'),
+          onTap: _exportBackup,
+        ),
+        ListTile(
+          contentPadding: EdgeInsets.zero,
+          leading: const Icon(Icons.download),
+          title: const Text('Importar'),
+          subtitle: const Text(
+              'Restaura una copia exportada antes (aquí o en otro equipo).'),
+          onTap: _importBackup,
         ),
 
         const SizedBox(height: 24),

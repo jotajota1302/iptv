@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../app/providers.dart';
 import '../app/theme.dart';
+import '../data/epg_service.dart';
 import '../data/vod_info_service.dart';
 import '../domain/content_type.dart';
 import '../domain/media_item.dart';
@@ -36,6 +37,7 @@ class HomeTab extends ConsumerWidget {
     final series = ref.watch(recentSeriesProvider);
     final cont = ref.watch(continueWatchingProvider);
     final favs = ref.watch(favoritesProvider);
+    final nowOn = ref.watch(nowOnFavoritesProvider);
     final hour = TimeOfDay.now().hour;
 
     final loading = movies.isLoading && series.isLoading;
@@ -58,6 +60,7 @@ class HomeTab extends ConsumerWidget {
           ref.invalidate(recentSeriesProvider);
           ref.invalidate(continueWatchingProvider);
           ref.invalidate(favoritesProvider);
+          ref.invalidate(nowOnFavoritesProvider);
         },
         child: ListView(
           padding: const EdgeInsets.only(bottom: 24),
@@ -75,6 +78,7 @@ class HomeTab extends ConsumerWidget {
             ],
             if (nothing) _EmptyHome(onAdd: () => _goTab(ref, 5)),
             if (featured.isNotEmpty) _Hero(movies: featured),
+            _railNowOn(context, nowOn.value ?? const []),
             _railContinue(context, ref, cont.value ?? const []),
             _railMovies(context, ref, movies.value ?? const []),
             _railSeries(context, ref, series.value ?? const []),
@@ -82,6 +86,20 @@ class HomeTab extends ConsumerWidget {
           ],
         ),
       ),
+    );
+  }
+
+  /// Qué están emitiendo ahora los canales favoritos.
+  Widget _railNowOn(
+      BuildContext c, List<({MediaItem channel, EpgEntry entry})> items) {
+    return ContentRail(
+      title: 'Ahora en tus canales',
+      itemWidth: 270,
+      height: 86,
+      items: [
+        for (final it in items)
+          _NowCard(channel: it.channel, entry: it.entry),
+      ],
     );
   }
 
@@ -342,7 +360,7 @@ class _HeroCard extends ConsumerWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text('DESTACADA',
+        Text('DESTACADA',
             style: TextStyle(
                 color: kAccent,
                 fontSize: 11,
@@ -408,6 +426,93 @@ class _HeroCard extends ConsumerWidget {
         ),
         child: Text(text, style: const TextStyle(fontSize: 11)),
       );
+}
+
+/// Tarjeta del rail "Ahora en tus canales": canal + programa en emisión con
+/// su avance. Al tocarla se abre el canal a pantalla completa.
+class _NowCard extends StatelessWidget {
+  final MediaItem channel;
+  final EpgEntry entry;
+  const _NowCard({required this.channel, required this.entry});
+
+  String _hhmm(DateTime d) =>
+      '${d.hour.toString().padLeft(2, '0')}:${d.minute.toString().padLeft(2, '0')}';
+
+  @override
+  Widget build(BuildContext context) {
+    final now = DateTime.now();
+    final progress = (now.difference(entry.start).inSeconds /
+            entry.end.difference(entry.start).inSeconds.clamp(1, 1 << 31))
+        .clamp(0.0, 1.0);
+    return Card(
+      child: InkWell(
+        onTap: () => openPlayer(context, channel),
+        child: Padding(
+          padding: const EdgeInsets.all(10),
+          child: Row(
+            children: [
+              Container(
+                width: 46,
+                height: 46,
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF7F8FA),
+                  borderRadius: BorderRadius.circular(9),
+                ),
+                child: channel.logoUrl == null
+                    ? const Icon(Icons.live_tv,
+                        size: 22, color: Colors.black38)
+                    : CachedNetworkImage(
+                        imageUrl: channel.logoUrl!,
+                        fit: BoxFit.contain,
+                        errorWidget: (_, _, _) => const Icon(Icons.live_tv,
+                            size: 22, color: Colors.black38),
+                      ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(channel.name,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                            fontSize: 13, fontWeight: FontWeight.w800)),
+                    const SizedBox(height: 2),
+                    Text(entry.title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                            fontSize: 12, color: Colors.white70)),
+                    const SizedBox(height: 6),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(2),
+                            child: LinearProgressIndicator(
+                                value: progress,
+                                minHeight: 3,
+                                backgroundColor: Colors.white12),
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        Text(_hhmm(entry.end),
+                            style: const TextStyle(
+                                fontSize: 10, color: Colors.white38)),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 class _EmptyHome extends StatelessWidget {

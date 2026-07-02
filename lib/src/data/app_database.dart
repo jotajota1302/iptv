@@ -273,6 +273,59 @@ class AppDatabase extends _$AppDatabase {
         .get();
     return rows.map(_map).toList();
   }
+
+  /// Exporta los flags de usuario (favoritos, ocultos/borrados y progreso)
+  /// para la copia de seguridad. Solo items que tengan algún dato de usuario.
+  Future<Map<String, dynamic>> exportUserFlags() async {
+    final rows = await (select(items)
+          ..where((t) =>
+              t.isFavorite |
+              t.isHidden |
+              t.isDeleted |
+              t.positionSeconds.isBiggerThanValue(0)))
+        .get();
+    return {
+      for (final r in rows)
+        r.id: {
+          if (r.isFavorite) 'fav': true,
+          if (r.isHidden) 'hidden': true,
+          if (r.isDeleted) 'deleted': true,
+          if (r.positionSeconds > 0) 'pos': r.positionSeconds,
+          if (r.durationSeconds > 0) 'dur': r.durationSeconds,
+          if (r.lastWatchedAt > 0) 'watched': r.lastWatchedAt,
+        },
+    };
+  }
+
+  /// Aplica flags exportados con [exportUserFlags] sobre los items que
+  /// existan ahora mismo (mismo id). Devuelve cuántos items se han tocado.
+  Future<int> importUserFlags(Map<String, dynamic> flags) async {
+    var applied = 0;
+    await transaction(() async {
+      for (final e in flags.entries) {
+        final f = e.value;
+        if (f is! Map) continue;
+        final companion = ItemsCompanion(
+          isFavorite:
+              f['fav'] == true ? const Value(true) : const Value.absent(),
+          isHidden:
+              f['hidden'] == true ? const Value(true) : const Value.absent(),
+          isDeleted:
+              f['deleted'] == true ? const Value(true) : const Value.absent(),
+          positionSeconds:
+              f['pos'] is int ? Value(f['pos'] as int) : const Value.absent(),
+          durationSeconds:
+              f['dur'] is int ? Value(f['dur'] as int) : const Value.absent(),
+          lastWatchedAt: f['watched'] is int
+              ? Value(f['watched'] as int)
+              : const Value.absent(),
+        );
+        applied += await (update(items)..where((t) => t.id.equals(e.key)))
+            .write(companion);
+      }
+    });
+    return applied;
+  }
 }
 
 LazyDatabase _open() => LazyDatabase(() async {

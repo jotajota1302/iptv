@@ -59,6 +59,10 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
   bool _osdVisible = false;
   Timer? _osdTimer;
 
+  // Temporizador de apagado: pausa la reproducción al vencer.
+  Timer? _sleepTimer;
+  int _sleepMinutes = 0;
+
   bool get _isLive => widget.item.type == ContentType.live;
 
   @override
@@ -325,8 +329,42 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     );
   }
 
+  /// Programa (o cancela, con 0) el temporizador de apagado.
+  void _setSleep(int minutes) {
+    _sleepTimer?.cancel();
+    _sleepTimer = null;
+    setState(() => _sleepMinutes = minutes);
+    if (minutes <= 0) return;
+    _sleepTimer = Timer(Duration(minutes: minutes), () {
+      if (!mounted) return;
+      _ctrl.player.pause();
+      setState(() => _sleepMinutes = 0);
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('Reproducción pausada por el temporizador')));
+    });
+  }
+
+  Widget _sleepButton() {
+    final active = _sleepMinutes > 0;
+    return PopupMenuButton<int>(
+      icon: Icon(active ? Icons.bedtime : Icons.bedtime_outlined,
+          color: active ? Theme.of(context).colorScheme.primary : null),
+      tooltip: active
+          ? 'Temporizador: $_sleepMinutes min'
+          : 'Temporizador de apagado',
+      initialValue: _sleepMinutes,
+      onSelected: _setSleep,
+      itemBuilder: (_) => [
+        const CheckedPopupMenuItem(value: 0, child: Text('Desactivado')),
+        for (final m in const [15, 30, 60, 90])
+          CheckedPopupMenuItem(value: m, child: Text('$m minutos')),
+      ],
+    );
+  }
+
   @override
   void dispose() {
+    _sleepTimer?.cancel();
     _osdTimer?.cancel();
     // 1) Cortar el audio LO PRIMERO, pase lo que pase con el resto.
     final ctrl = _ctrl;
@@ -432,7 +470,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
                 )
               : null,
           title: Text(widget.item.name),
-          actions: [..._trackActions(), _helpButton(context)]),
+          actions: [..._trackActions(), _sleepButton(), _helpButton(context)]),
       backgroundColor: Colors.black,
       body: Focus(
         autofocus: true,

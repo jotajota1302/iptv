@@ -26,6 +26,10 @@ Future<void> main(List<String> args) async {
   WidgetsFlutterBinding.ensureInitialized();
   MediaKit.ensureInitialized();
   final prefs = await SharedPreferences.getInstance();
+  // Color de acento elegido, antes de construir el tema.
+  kAccent = kAccentChoices[(prefs.getInt('accent_color') ?? 0)
+          .clamp(0, kAccentChoices.length - 1)]
+      .$2;
   // Modo visor: lanzado con `--play <url>` desde la ventana principal, esta
   // instancia es solo una ventana de reproducción independiente.
   final viewer = parseViewerArgs(args);
@@ -52,10 +56,12 @@ class ViewerApp extends StatelessWidget {
   }
 }
 
-class IptvApp extends StatelessWidget {
+class IptvApp extends ConsumerWidget {
   const IptvApp({super.key});
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    // Al cambiar el acento en Ajustes se reconstruye el tema entero.
+    ref.watch(accentIndexProvider);
     return MaterialApp(
       title: 'IPTV Player',
       debugShowCheckedModeBanner: false,

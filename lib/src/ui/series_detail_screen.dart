@@ -308,7 +308,7 @@ class _SeriesDetailScreenState extends ConsumerState<SeriesDetailScreen> {
               ),
             if (watched) ...[
               Container(color: Colors.black45),
-              const Center(
+              Center(
                   child: Icon(Icons.check_circle, color: kAccent, size: 26)),
             ] else if (frac > 0)
               Align(

@@ -16,6 +16,7 @@ import '../domain/content_type.dart';
 import '../domain/media_item.dart';
 import '../domain/series_group.dart';
 import '../domain/sort_mode.dart';
+import 'theme.dart';
 
 final databaseProvider = Provider<AppDatabase>((ref) {
   final db = AppDatabase();
@@ -108,6 +109,27 @@ final loadedListUrlProvider = FutureProvider<String?>((ref) async {
 final sharedPrefsProvider = Provider<SharedPreferences>(
     (_) => throw UnimplementedError('sharedPrefsProvider debe sobrescribirse'));
 
+/// Índice del color de acento elegido (ver [kAccentChoices]). Persistido.
+final accentIndexProvider = StateProvider<int>((ref) =>
+    (ref.watch(sharedPrefsProvider).getInt('accent_color') ?? 0)
+        .clamp(0, kAccentChoices.length - 1));
+
+/// Cambia el acento: actualiza el color global y reconstruye el tema.
+void setAccentIndex(WidgetRef ref, int index) {
+  kAccent = kAccentChoices[index].$2;
+  ref.read(accentIndexProvider.notifier).state = index;
+  ref.read(sharedPrefsProvider).setInt('accent_color', index);
+}
+
+/// Recargar la lista activa automáticamente al arrancar la app. Persistido.
+final autoRefreshProvider = StateProvider<bool>(
+    (ref) => ref.watch(sharedPrefsProvider).getBool('auto_refresh') ?? true);
+
+void setAutoRefresh(WidgetRef ref, bool value) {
+  ref.read(autoRefreshProvider.notifier).state = value;
+  ref.read(sharedPrefsProvider).setBool('auto_refresh', value);
+}
+
 const _kHwAccel = 'hardware_accel';
 const _kDeinterlace = 'deinterlace';
 
@@ -138,6 +160,12 @@ void setDeinterlaceSetting(WidgetRef ref, bool value) {
 final liveByCategoryProvider =
     FutureProvider.family<List<MediaItem>, String>((ref, group) {
   return ref.watch(playlistRepositoryProvider).liveByCategory(group);
+});
+
+/// Primeros logos de cada categoría de TV (collage de las tarjetas).
+final liveCategoryLogosProvider =
+    FutureProvider<Map<String, List<String>>>((ref) {
+  return ref.watch(playlistRepositoryProvider).liveLogosByCategory();
 });
 
 // --- VOD: películas y series ---
@@ -204,6 +232,29 @@ final previewEpgProvider =
 final channelGuideProvider =
     FutureProvider.family<List<EpgEntry>, String>((ref, streamUrl) {
   return ref.watch(epgServiceProvider).fullEpg(streamUrl);
+});
+
+/// Qué emiten ahora mismo los canales favoritos (máx. 12), para el rail
+/// "Ahora en tus canales" del Inicio. Best-effort: canales sin EPG se omiten.
+final nowOnFavoritesProvider =
+    FutureProvider<List<({MediaItem channel, EpgEntry entry})>>((ref) async {
+  final favs = (await ref.watch(favoritesProvider.future))
+      .where((i) => i.type == ContentType.live)
+      .take(12)
+      .toList();
+  if (favs.isEmpty) return const [];
+  final epg = ref.watch(epgServiceProvider);
+  final now = DateTime.now();
+  final results = await Future.wait(favs.map((c) async {
+    final entries = await epg.shortEpg(c.streamUrl);
+    for (final e in entries) {
+      if (!now.isBefore(e.start) && now.isBefore(e.end)) {
+        return (channel: c, entry: e);
+      }
+    }
+    return null;
+  }));
+  return [for (final r in results) ?r];
 });
 
 /// Clave para gestión por categoría: tipo de contenido + nombre de la categoría.
