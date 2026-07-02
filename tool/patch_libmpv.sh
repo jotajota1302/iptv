@@ -51,11 +51,26 @@ if [ ! -f "$LOCAL_DLL" ] || ! verify_dll; then
   fi
 fi
 
+# DLLs del paquete LGPL (tool/use_libmpv_lgpl.sh) que NO usa el build GPL
+# monolítico: se limpian para no engordar la distribución de desarrollo.
+LGPL_DEPS="avcodec-61.dll avdevice-61.dll avfilter-10.dll avformat-61.dll \
+avutil-59.dll swresample-5.dll swscale-8.dll libass-9.dll libplacebo-360.dll \
+libshaderc_shared.dll libspirv-cross-c-shared.dll libdovi.dll vulkan-1.dll \
+libbrotlicommon.dll libbrotlidec.dll libbz2-1.dll libexpat-1.dll \
+libfontconfig-1.dll libfreetype-6.dll libfribidi-0.dll libgcc_s_seh-1.dll \
+libglib-2.0-0.dll libgraphite2.dll libharfbuzz-0.dll libiconv-2.dll \
+libintl-8.dll libjpeg-8.dll liblcms2-2.dll liblzma-5.dll libpcre2-8-0.dll \
+libpng16-16.dll libstdc++-6.dll libunibreak-7.dll libwinpthread-1.dll zlib1.dll"
+
 patched=0
 for cfg in Debug Release; do
   dst="$ROOT/build/windows/x64/runner/$cfg/libmpv-2.dll"
   if [ -f "$dst" ]; then
     cp "$LOCAL_DLL" "$dst"
+    for dep in $LGPL_DEPS; do
+      rm -f "$ROOT/build/windows/x64/runner/$cfg/$dep"
+    done
+    rm -rf "$ROOT/build/windows/x64/runner/$cfg/licenses"
     echo "Parcheada libmpv-2.dll en $cfg ($(du -h "$dst" | cut -f1))"
     patched=1
   fi

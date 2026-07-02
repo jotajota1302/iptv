@@ -37,7 +37,12 @@ Future<void> main(List<String> args) async {
   // Modo visor: lanzado con `--play <url>` desde la ventana principal, esta
   // instancia es solo una ventana de reproducción independiente.
   final viewer = parseViewerArgs(args);
-  if (viewer == null) setWindowTitle(Brand.name);
+  if (viewer == null) {
+    setWindowTitle(Brand.name);
+    // Tamaño de arranque cómodo y proporcional a la pantalla (los visores
+    // no: su gracia es poder colocarlos pequeños donde quieras).
+    sizeWindowComfortably();
+  }
   runApp(ProviderScope(
     overrides: [sharedPrefsProvider.overrideWithValue(prefs)],
     child: viewer == null ? const IptvApp() : ViewerApp(args: viewer),
