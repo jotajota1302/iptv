@@ -1,11 +1,9 @@
-import 'dart:ui';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../app/providers.dart';
 import '../app/theme.dart';
 import '../data/epg_service.dart';
-import '../data/vod_info_service.dart';
 import '../domain/content_type.dart';
 import '../domain/media_item.dart';
 import '../domain/series_group.dart';
@@ -44,7 +42,7 @@ class HomeTab extends ConsumerWidget {
     final loading = movies.isLoading && series.isLoading;
     final featured = (movies.value ?? const <MediaItem>[])
         .where((m) => m.logoUrl != null)
-        .take(6)
+        .take(14)
         .toList();
 
     final nothing = !loading &&
@@ -192,7 +190,9 @@ class HomeTab extends ConsumerWidget {
   }
 }
 
-/// Carrusel "hero" destacado en la parte superior.
+/// Carrusel "jukebox" de novedades: fila de carátulas todas visibles con la
+/// central destacada (más grande y con acento) y la ficha compacta debajo.
+/// Aprovecha todo el ancho de la ventana sin dejar espacio muerto.
 class _Hero extends StatefulWidget {
   final List<MediaItem> movies;
   const _Hero({required this.movies});
@@ -201,18 +201,32 @@ class _Hero extends StatefulWidget {
 }
 
 class _HeroState extends State<_Hero> {
-  final _pc = PageController(viewportFraction: 0.92);
+  PageController? _pc;
+  double _fraction = 0;
   int _page = 0;
+
+  /// El PageController depende del ancho (cada carátula ≈176 px lógicos);
+  /// se recrea si la ventana cambia de tamaño, conservando la página.
+  void _ensureController(double width) {
+    final f = (176 / width).clamp(0.07, 0.45).toDouble();
+    if (_pc != null && (f - _fraction).abs() < 0.005) return;
+    final old = _pc;
+    _fraction = f;
+    _pc = PageController(viewportFraction: f, initialPage: _page);
+    if (old != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => old.dispose());
+    }
+  }
 
   @override
   void dispose() {
-    _pc.dispose();
+    _pc?.dispose();
     super.dispose();
   }
 
   void _go(int delta) {
     final target = (_page + delta).clamp(0, widget.movies.length - 1);
-    _pc.animateToPage(target,
+    _pc?.animateToPage(target,
         duration: const Duration(milliseconds: 350), curve: Curves.easeOut);
   }
 
@@ -223,52 +237,195 @@ class _HeroState extends State<_Hero> {
       children: [
         const SizedBox(height: 12),
         SizedBox(
-          height: 260,
-          child: Stack(
-            alignment: Alignment.center,
-            children: [
-              PageView.builder(
-                controller: _pc,
-                itemCount: movies.length,
-                onPageChanged: (i) => setState(() => _page = i),
-                itemBuilder: (_, i) => Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 6),
-                  child: _HeroCard(movie: movies[i]),
-                ),
-              ),
-              if (_page > 0)
-                Positioned(
-                  left: 8,
-                  child: _HeroArrow(
-                      icon: Icons.chevron_left, onTap: () => _go(-1)),
-                ),
-              if (_page < movies.length - 1)
-                Positioned(
-                  right: 8,
-                  child: _HeroArrow(
-                      icon: Icons.chevron_right, onTap: () => _go(1)),
-                ),
-            ],
+          height: 236,
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              _ensureController(constraints.maxWidth);
+              final pc = _pc!;
+              return Stack(
+                alignment: Alignment.center,
+                children: [
+                  PageView.builder(
+                    controller: pc,
+                    itemCount: movies.length,
+                    onPageChanged: (i) => setState(() => _page = i),
+                    itemBuilder: (_, i) => AnimatedBuilder(
+                      animation: pc,
+                      builder: (_, _) {
+                        final page = pc.position.haveDimensions
+                            ? (pc.page ?? _page.toDouble())
+                            : _page.toDouble();
+                        final d = (page - i).abs().clamp(0.0, 3.0);
+                        final scale = 1.0 - (d * 0.13).clamp(0.0, 0.34);
+                        final opacity = 1.0 - (d * 0.22).clamp(0.0, 0.62);
+                        return Center(
+                          child: Opacity(
+                            opacity: opacity,
+                            child: Transform.scale(
+                              scale: scale,
+                              child: _JukeboxCard(
+                                movie: movies[i],
+                                focused: i == _page,
+                                onTap: () {
+                                  if (i == _page) {
+                                    Navigator.of(context).push(
+                                        MaterialPageRoute(
+                                            builder: (_) => MovieDetailScreen(
+                                                item: movies[i])));
+                                  } else {
+                                    pc.animateToPage(i,
+                                        duration:
+                                            const Duration(milliseconds: 350),
+                                        curve: Curves.easeOut);
+                                  }
+                                },
+                              ),
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                  if (_page > 0)
+                    Positioned(
+                      left: 8,
+                      child: _HeroArrow(
+                          icon: Icons.chevron_left, onTap: () => _go(-1)),
+                    ),
+                  if (_page < movies.length - 1)
+                    Positioned(
+                      right: 8,
+                      child: _HeroArrow(
+                          icon: Icons.chevron_right, onTap: () => _go(1)),
+                    ),
+                ],
+              );
+            },
           ),
         ),
-        const SizedBox(height: 8),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            for (var i = 0; i < movies.length; i++)
-              AnimatedContainer(
-                duration: const Duration(milliseconds: 250),
-                margin: const EdgeInsets.symmetric(horizontal: 3),
-                width: i == _page ? 18 : 6,
-                height: 6,
-                decoration: BoxDecoration(
-                  color: i == _page ? kAccent : Colors.white24,
-                  borderRadius: BorderRadius.circular(3),
-                ),
-              ),
-          ],
+        const SizedBox(height: 10),
+        // Ficha compacta de la carátula enfocada.
+        AnimatedSwitcher(
+          duration: const Duration(milliseconds: 250),
+          child: _FocusedInfo(
+              key: ValueKey(movies[_page].id), movie: movies[_page]),
         ),
       ],
+    );
+  }
+}
+
+/// Carátula 2:3 del jukebox; la enfocada lleva borde de acento y sombra.
+class _JukeboxCard extends StatelessWidget {
+  final MediaItem movie;
+  final bool focused;
+  final VoidCallback onTap;
+  const _JukeboxCard(
+      {required this.movie, required this.focused, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AspectRatio(
+        aspectRatio: 2 / 3,
+        child: Container(
+          margin: const EdgeInsets.symmetric(horizontal: 5),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(12),
+            border: focused ? Border.all(color: kAccent, width: 2.5) : null,
+            boxShadow: focused
+                ? [
+                    BoxShadow(
+                        color: kAccent.withValues(alpha: 0.35),
+                        blurRadius: 18,
+                        spreadRadius: 1)
+                  ]
+                : const [
+                    BoxShadow(color: Colors.black54, blurRadius: 8),
+                  ],
+          ),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(9.5),
+            child: movie.logoUrl == null
+                ? Container(
+                    color: kSurfaceHigh,
+                    child: const Icon(Icons.movie_outlined, size: 40))
+                : CachedNetworkImage(
+                    imageUrl: movie.logoUrl!,
+                    fit: BoxFit.cover,
+                    errorWidget: (_, _, _) => Container(
+                        color: kSurfaceHigh,
+                        child: const Icon(Icons.movie_outlined, size: 40)),
+                  ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Título + metadatos + acciones de la película enfocada en el jukebox.
+class _FocusedInfo extends ConsumerWidget {
+  final MediaItem movie;
+  const _FocusedInfo({super.key, required this.movie});
+
+  Widget _pill(String text) => Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: 0.12),
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Text(text, style: const TextStyle(fontSize: 11.5)),
+      );
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final info = ref.watch(vodInfoProvider(movie.streamUrl)).value;
+    final meta = <String>[
+      if (info?.year != null) info!.year!,
+      if ((info?.genre ?? '').isNotEmpty) info!.genre!,
+      if ((info?.rating ?? '').isNotEmpty) '⭐ ${info!.rating}',
+    ];
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 24),
+      child: Column(
+        children: [
+          Text(movie.name,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.center,
+              style:
+                  const TextStyle(fontSize: 20, fontWeight: FontWeight.w800)),
+          if (meta.isNotEmpty) ...[
+            const SizedBox(height: 6),
+            Wrap(
+              spacing: 6,
+              runSpacing: 4,
+              alignment: WrapAlignment.center,
+              children: [for (final m in meta) _pill(m)],
+            ),
+          ],
+          const SizedBox(height: 10),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              FilledButton.icon(
+                onPressed: () => openPlayer(context, movie),
+                icon: const Icon(Icons.play_arrow, size: 20),
+                label: const Text('Ver'),
+              ),
+              const SizedBox(width: 8),
+              OutlinedButton.icon(
+                onPressed: () => Navigator.of(context).push(MaterialPageRoute(
+                    builder: (_) => MovieDetailScreen(item: movie))),
+                icon: const Icon(Icons.info_outline, size: 18),
+                label: const Text('Info'),
+              ),
+            ],
+          ),
+        ],
+      ),
     );
   }
 }
@@ -292,143 +449,6 @@ class _HeroArrow extends StatelessWidget {
       ),
     );
   }
-}
-
-class _HeroCard extends ConsumerWidget {
-  final MediaItem movie;
-  const _HeroCard({required this.movie});
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final info = ref.watch(vodInfoProvider(movie.streamUrl)).value;
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(20),
-      child: Stack(
-        fit: StackFit.expand,
-        children: [
-          // Fondo: backdrop de la ficha si existe, o el póster desenfocado.
-          if (info?.backdrop != null)
-            CachedNetworkImage(imageUrl: info!.backdrop!, fit: BoxFit.cover)
-          else if (movie.logoUrl != null)
-            ImageFiltered(
-              imageFilter: ImageFilter.blur(sigmaX: 24, sigmaY: 24),
-              child: CachedNetworkImage(
-                  imageUrl: movie.logoUrl!, fit: BoxFit.cover),
-            )
-          else
-            Container(color: kSurfaceHigh),
-          const DecoratedBox(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topRight,
-                end: Alignment.bottomLeft,
-                colors: [Color(0x66000000), Color(0xF5000000)],
-              ),
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(12),
-                  child: SizedBox(
-                    width: 110,
-                    height: 165,
-                    child: movie.logoUrl == null
-                        ? Container(
-                            color: kSurfaceHigh,
-                            child: const Icon(Icons.movie_outlined, size: 40))
-                        : CachedNetworkImage(
-                            imageUrl: movie.logoUrl!, fit: BoxFit.cover),
-                  ),
-                ),
-                const SizedBox(width: 16),
-                Expanded(child: _details(context, info)),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _details(BuildContext context, VodInfo? info) {
-    final meta = <String>[
-      if (info?.year != null) info!.year!,
-      if (info?.genre != null) info!.genre!,
-      if (info?.rating != null) '⭐ ${info!.rating}',
-    ];
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text('DESTACADA',
-            style: TextStyle(
-                color: kAccent,
-                fontSize: 11,
-                fontWeight: FontWeight.w800,
-                letterSpacing: 1.2)),
-        const SizedBox(height: 4),
-        Text(movie.name,
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(fontSize: 19, fontWeight: FontWeight.w800)),
-        if (meta.isNotEmpty) ...[
-          const SizedBox(height: 6),
-          Wrap(
-            spacing: 6,
-            runSpacing: 4,
-            children: [for (final m in meta) _pill(m)],
-          ),
-        ],
-        const SizedBox(height: 8),
-        Expanded(
-          child: (info?.plot ?? '').isEmpty
-              ? const SizedBox.shrink()
-              : Text(info!.plot!,
-                  maxLines: 4,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                      fontSize: 12.5, height: 1.35, color: Colors.white70)),
-        ),
-        if (info?.cast != null)
-          Padding(
-            padding: const EdgeInsets.only(bottom: 6),
-            child: Text('Reparto: ${info!.cast!}',
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(fontSize: 11, color: Colors.white54)),
-          ),
-        Row(
-          children: [
-            FilledButton.icon(
-              onPressed: () => openPlayer(context, movie),
-              icon: const Icon(Icons.play_arrow, size: 20),
-              label: const Text('Ver'),
-            ),
-            const SizedBox(width: 8),
-            IconButton.filledTonal(
-              onPressed: () => Navigator.of(context).push(
-                MaterialPageRoute(
-                    builder: (_) => MovieDetailScreen(item: movie)),
-              ),
-              icon: const Icon(Icons.info_outline),
-            ),
-          ],
-        ),
-      ],
-    );
-  }
-
-  Widget _pill(String text) => Container(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-        decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.14),
-          borderRadius: BorderRadius.circular(20),
-        ),
-        child: Text(text, style: const TextStyle(fontSize: 11)),
-      );
 }
 
 /// Tarjeta del rail "Ahora en tus canales": canal + programa en emisión con
