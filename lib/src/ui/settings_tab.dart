@@ -26,6 +26,7 @@ class _SettingsTabState extends ConsumerState<SettingsTab> {
   final _nameCtrl = TextEditingController();
   final _userCtrl = TextEditingController();
   final _passCtrl = TextEditingController();
+  late final _tmdbCtrl = TextEditingController(text: ref.read(tmdbKeyProvider));
   bool _loading = false;
 
   @override
@@ -34,7 +35,16 @@ class _SettingsTabState extends ConsumerState<SettingsTab> {
     _nameCtrl.dispose();
     _userCtrl.dispose();
     _passCtrl.dispose();
+    _tmdbCtrl.dispose();
     super.dispose();
+  }
+
+  void _saveTmdbKey() {
+    setTmdbKey(ref, _tmdbCtrl.text.trim());
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(_tmdbCtrl.text.trim().isEmpty
+            ? 'Clave borrada: reparto y actores desactivados'
+            : 'Clave guardada: reparto y actores activados')));
   }
 
   /// Modo proveedor (white-label): inicia sesión con usuario/contraseña
@@ -716,6 +726,37 @@ class _SettingsTabState extends ConsumerState<SettingsTab> {
                 ),
               ),
           ],
+        ),
+
+        const SizedBox(height: 24),
+        const Divider(),
+        const Text('Metadatos', style: TextStyle(fontSize: 20)),
+        const SizedBox(height: 8),
+        const Text(
+          'Con una clave gratuita de themoviedb.org la app muestra el reparto '
+          'con fotos y fichas de actores con su filmografía.',
+          style: TextStyle(fontSize: 12, color: Colors.white54),
+        ),
+        const SizedBox(height: 10),
+        TextField(
+          controller: _tmdbCtrl,
+          decoration: InputDecoration(
+            labelText: 'Clave API de TMDB (v3 o token v4)',
+            isDense: true,
+            border: const OutlineInputBorder(),
+            suffixIcon: IconButton(
+              icon: const Icon(Icons.save_outlined),
+              tooltip: 'Guardar',
+              onPressed: _saveTmdbKey,
+            ),
+          ),
+          onSubmitted: (_) => _saveTmdbKey(),
+        ),
+        const SizedBox(height: 6),
+        const Text(
+          'Este producto usa la API de TMDB sin estar avalado ni certificado '
+          'por TMDB.',
+          style: TextStyle(fontSize: 11, color: Colors.white38),
         ),
 
         const SizedBox(height: 24),

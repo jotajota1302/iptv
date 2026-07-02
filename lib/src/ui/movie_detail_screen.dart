@@ -5,11 +5,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../app/providers.dart';
 import '../app/theme.dart';
+import '../data/tmdb_service.dart';
 import '../data/vod_info_service.dart';
 import '../domain/media_item.dart';
 import '../domain/trailer_url.dart';
 import 'play_helpers.dart';
 import 'vod_poster.dart';
+import 'widgets/cast_rail.dart';
 import 'widgets/content_rail.dart';
 
 /// Ficha de película estilo cine: backdrop a pantalla con degradado, póster
@@ -30,6 +32,19 @@ class MovieDetailScreen extends ConsumerWidget {
     final pos = item.positionSeconds;
     final resumeLabel = pos > 5 ? 'Continuar · ${_fmt(pos)}' : 'Reproducir';
     final cat = item.groupTitle ?? 'Sin categoria';
+    // Reparto con fotos (TMDB): se pide cuando la ficha Xtream ya respondió,
+    // para aprovechar su tmdb_id/año y no buscar dos veces.
+    final tmdbCast = infoAsync.isLoading
+        ? const <TmdbCastMember>[]
+        : ref
+                .watch(castProvider((
+              isSeries: false,
+              title: item.name,
+              year: info?.year ?? yearFromName(item.name),
+              tmdbId: info?.tmdbId,
+            )))
+                .value ??
+            const <TmdbCastMember>[];
 
     return Scaffold(
       body: CustomScrollView(
@@ -119,7 +134,9 @@ class MovieDetailScreen extends ConsumerWidget {
                                 height: 1.5, color: Colors.white70)),
                         const SizedBox(height: 16),
                       ],
-                      if (info?.cast != null) _line('Reparto', info!.cast!),
+                      // El texto plano del proveedor solo si TMDB no da caras.
+                      if (info?.cast != null && tmdbCast.isEmpty)
+                        _line('Reparto', info!.cast!),
                       if (info?.director != null)
                         _line('Dirección', info!.director!),
                       if (info == null && !infoAsync.isLoading)
@@ -131,6 +148,8 @@ class MovieDetailScreen extends ConsumerWidget {
               ),
             ),
           ),
+          if (tmdbCast.isNotEmpty)
+            SliverToBoxAdapter(child: CastRail(cast: tmdbCast)),
           SliverToBoxAdapter(child: _related(context, ref, cat)),
         ],
       ),

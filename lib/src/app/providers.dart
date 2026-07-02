@@ -12,7 +12,9 @@ import '../data/m3u_source.dart';
 import '../data/playlist_repository.dart';
 import '../data/account_service.dart';
 import '../data/series_grouper.dart';
+import '../data/tmdb_service.dart';
 import '../data/update_service.dart';
+import '../domain/credit_match.dart';
 import '../data/series_info_service.dart';
 import '../data/vod_info_service.dart';
 import '../data/xmltv_service.dart';
@@ -123,6 +125,85 @@ final accountServiceProvider = Provider<AccountService>((_) => AccountService())
 final accountInfoProvider =
     FutureProvider.family<AccountInfo?, String>((ref, listUrl) {
   return ref.watch(accountServiceProvider).fetch(listUrl);
+});
+
+/// Clave de TMDB: preferencia del usuario > --dart-define=TMDB_API_KEY.
+/// Vacía = reparto y fichas de actores desactivados.
+final tmdbKeyProvider = StateProvider<String>((ref) =>
+    ref.watch(sharedPrefsProvider).getString('tmdb_key') ??
+    const String.fromEnvironment('TMDB_API_KEY'));
+
+void setTmdbKey(WidgetRef ref, String value) {
+  ref.read(tmdbKeyProvider.notifier).state = value;
+  ref.read(sharedPrefsProvider).setString('tmdb_key', value);
+}
+
+final tmdbServiceProvider = Provider<TmdbService?>((ref) {
+  final key = ref.watch(tmdbKeyProvider).trim();
+  return key.isEmpty ? null : TmdbService(credential: key);
+});
+
+typedef CastQuery = ({bool isSeries, String title, String? year, String? tmdbId});
+
+/// Reparto con fotos de una película o serie. Best-effort: lista vacía si no
+/// hay clave, no hay red o TMDB no encuentra el título.
+final castProvider =
+    FutureProvider.family<List<TmdbCastMember>, CastQuery>((ref, q) async {
+  final svc = ref.watch(tmdbServiceProvider);
+  if (svc == null) return const [];
+  try {
+    final title = cleanMediaTitle(q.title);
+    if (title.isEmpty) return const [];
+    return q.isSeries
+        ? await svc.tvCast(tmdbId: q.tmdbId, title: title, year: q.year)
+        : await svc.movieCast(tmdbId: q.tmdbId, title: title, year: q.year);
+  } catch (_) {
+    return const [];
+  }
+});
+
+final tmdbPersonProvider =
+    FutureProvider.family<TmdbPerson?, int>((ref, id) async {
+  final svc = ref.watch(tmdbServiceProvider);
+  if (svc == null) return null;
+  try {
+    return await svc.person(id);
+  } catch (_) {
+    return null;
+  }
+});
+
+/// Filmografía de una persona cruzada con el catálogo del usuario: cada
+/// crédito lleva el elemento de la lista IPTV que lo reproduce, si existe.
+final personCreditsProvider = FutureProvider.family<
+    List<({TmdbCredit credit, MediaItem? inCatalog})>, int>((ref, id) async {
+  final svc = ref.watch(tmdbServiceProvider);
+  if (svc == null) return const [];
+  List<TmdbCredit> credits;
+  try {
+    credits = await svc.personCredits(id);
+  } catch (_) {
+    return const [];
+  }
+  final repo = ref.watch(playlistRepositoryProvider);
+  final hideAdult = ref.watch(parentalHideProvider);
+  final out = <({TmdbCredit credit, MediaItem? inCatalog})>[];
+  for (final c in credits.take(80)) {
+    MediaItem? match;
+    final t = cleanMediaTitle(c.title);
+    if (t.length >= 2) {
+      try {
+        match = pickCatalogMatch(await repo.search(t), c);
+      } catch (_) {}
+    }
+    if (match != null &&
+        hideAdult &&
+        (isAdult(match.name) || isAdult(match.groupTitle))) {
+      match = null;
+    }
+    out.add((credit: c, inCatalog: match));
+  }
+  return out;
 });
 
 /// Versión instalada (del ejecutable compilado; única fuente: pubspec.yaml).

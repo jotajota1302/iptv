@@ -11,3 +11,8 @@ lib/diag.dart
 
 # libmpv completa (117MB, supera limite GitHub) - se obtiene con tool/patch_libmpv.sh
 third_party/
+
+# Artefactos de distribucion generados en local
+*.apk
+IPTV-Player-*.zip
+libmpv-lgpl-*.zip

@@ -7,9 +7,11 @@ import '../app/providers.dart';
 import '../app/theme.dart';
 import '../data/series_grouper.dart';
 import '../data/series_info_service.dart';
+import '../data/tmdb_service.dart';
 import '../domain/series_group.dart';
 import '../domain/trailer_url.dart';
 import 'player_screen.dart';
+import 'widgets/cast_rail.dart';
 
 /// Detalle de una serie estilo cine: backdrop con degradado, ficha (sinopsis,
 /// rating, género) y episodios con miniatura, título limpio y duración. Los
@@ -54,6 +56,18 @@ class _SeriesDetailScreenState extends ConsumerState<SeriesDetailScreen> {
     final info = infoAsync.value;
     final seasons = series.sortedSeasons;
     final episodes = series.seasons[_season] ?? const <Episode>[];
+    // Reparto con fotos (TMDB), tras responder la ficha Xtream.
+    final tmdbCast = infoAsync.isLoading
+        ? const <TmdbCastMember>[]
+        : ref
+                .watch(castProvider((
+              isSeries: true,
+              title: series.title,
+              year: yearFromName(series.title),
+              tmdbId: null,
+            )))
+                .value ??
+            const <TmdbCastMember>[];
 
     return Scaffold(
       body: CustomScrollView(
@@ -100,7 +114,8 @@ class _SeriesDetailScreenState extends ConsumerState<SeriesDetailScreen> {
                       const SizedBox(height: 14),
                       _plot(info!.plot!),
                     ],
-                    if ((info?.cast ?? '').isNotEmpty) ...[
+                    // Texto plano del proveedor solo si TMDB no da caras.
+                    if ((info?.cast ?? '').isNotEmpty && tmdbCast.isEmpty) ...[
                       const SizedBox(height: 10),
                       _line('Reparto', info!.cast!),
                     ],
@@ -109,6 +124,8 @@ class _SeriesDetailScreenState extends ConsumerState<SeriesDetailScreen> {
                 ),
             ),
           ),
+          if (tmdbCast.isNotEmpty)
+            SliverToBoxAdapter(child: CastRail(cast: tmdbCast)),
           if (seasons.length > 1)
             SliverToBoxAdapter(
               child: SizedBox(
