@@ -69,13 +69,19 @@ jobs:
         run: |
           mkdir -p dist
           cp mpv/build/libmpv-2.dll dist/
-          # DLLs de las que depende (MinGW/FFmpeg propios): junto al exe de la app.
+          # DLLs de las que depende (MinGW/FFmpeg propios): junto al exe de la
+          # app. ntldd devuelve rutas estilo Windows -> cygpath las convierte.
           export PATH=/mingw64/local/bin:$PATH
-          ntldd -R dist/libmpv-2.dll | grep -iv 'windows\|not found' | awk '{print $3}' | sort -u | while read f; do
-            case "$f" in
-              /mingw64/*|/*/local/*) cp -v "$f" dist/ || true ;;
-            esac
-          done
+          ntldd -R dist/libmpv-2.dll
+          ntldd -R dist/libmpv-2.dll \
+            | grep -i 'mingw64\|msys64' \
+            | sed 's/.*=> \(.*\) (0x.*/\1/' \
+            | sort -u \
+            | while read -r f; do
+                u=$(cygpath -u "$f" 2>/dev/null || echo "$f")
+                cp -v "$u" dist/ || true
+              done
+          ls -la dist/
           # Textos de licencia para la pantalla de atribuciones.
           mkdir -p dist/licenses
           cp mpv/LICENSE.LGPL dist/licenses/mpv-LICENSE.LGPL || true
