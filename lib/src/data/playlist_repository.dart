@@ -122,6 +122,18 @@ class PlaylistRepository {
   /// Posición de reproducción guardada (segundos) de un item.
   Future<int> progress(String id) => _db.getPosition(id);
 
+  /// Marca manualmente un item como visto (fracción 1) o sin ver (progreso a
+  /// cero, también lo saca de "Continuar viendo" y del historial).
+  Future<void> setWatched(MediaItem item, bool watched) {
+    if (!watched) return _db.setProgress(item.id, 0, 0, 0);
+    final dur = item.durationSeconds > 0 ? item.durationSeconds : 1;
+    return _db.setProgress(
+        item.id, dur, dur, DateTime.now().millisecondsSinceEpoch);
+  }
+
+  /// Historial de reproducción (más recientes primero).
+  Future<List<MediaItem>> history() => _db.history();
+
   /// URL de un stream cargado (para reconstruir la lista si se cargó sin guardar).
   Future<String?> sampleStreamUrl() => _db.sampleStreamUrl();
 

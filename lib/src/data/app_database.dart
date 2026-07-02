@@ -261,6 +261,16 @@ class AppDatabase extends _$AppDatabase {
     return rows.map(_map).toList();
   }
 
+  /// Historial: items reproducidos alguna vez, más recientes primero.
+  Future<List<MediaItem>> history({int limit = 200}) async {
+    final rows = await (select(items)
+          ..where((t) => t.lastWatchedAt.isBiggerThanValue(0) & _visible(t))
+          ..orderBy([(t) => OrderingTerm.desc(t.lastWatchedAt)])
+          ..limit(limit))
+        .get();
+    return rows.map(_map).toList();
+  }
+
   /// URL de un stream cualquiera (para reconstruir la URL de la lista cargada).
   Future<String?> sampleStreamUrl() async {
     final row = await (select(items)..limit(1)).getSingleOrNull();

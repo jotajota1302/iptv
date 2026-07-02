@@ -2,10 +2,12 @@ import 'dart:ui';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../app/providers.dart';
 import '../app/theme.dart';
 import '../data/vod_info_service.dart';
 import '../domain/media_item.dart';
+import '../domain/trailer_url.dart';
 import 'play_helpers.dart';
 import 'vod_poster.dart';
 import 'widgets/content_rail.dart';
@@ -54,7 +56,7 @@ class MovieDetailScreen extends ConsumerWidget {
                     const SizedBox(height: 16),
                     if (info != null) _chips(context, info),
                     const SizedBox(height: 16),
-                    _actions(context, ref, resumeLabel, cat),
+                    _actions(context, ref, resumeLabel, cat, info),
                     const SizedBox(height: 20),
                     if (infoAsync.isLoading) const _LoadingLine(),
                     if (info != null && (info.plot ?? '').isNotEmpty) ...[
@@ -164,8 +166,10 @@ class MovieDetailScreen extends ConsumerWidget {
     );
   }
 
-  Widget _actions(
-      BuildContext context, WidgetRef ref, String resumeLabel, String cat) {
+  Widget _actions(BuildContext context, WidgetRef ref, String resumeLabel,
+      String cat, VodInfo? info) {
+    final trailer = trailerUrl(info?.youtubeTrailer);
+    final watched = item.watchedFraction >= 0.9;
     return Row(
       children: [
         Expanded(
@@ -178,6 +182,30 @@ class MovieDetailScreen extends ConsumerWidget {
             icon: const Icon(Icons.play_arrow),
             label: Text(resumeLabel),
           ),
+        ),
+        if (trailer != null) ...[
+          const SizedBox(width: 10),
+          IconButton.filledTonal(
+            iconSize: 22,
+            tooltip: 'Ver tráiler',
+            onPressed: () => launchUrl(Uri.parse(trailer),
+                mode: LaunchMode.externalApplication),
+            icon: const Icon(Icons.ondemand_video),
+          ),
+        ],
+        const SizedBox(width: 10),
+        IconButton.filledTonal(
+          iconSize: 22,
+          tooltip: watched ? 'Marcar como no visto' : 'Marcar como visto',
+          onPressed: () async {
+            await ref
+                .read(playlistRepositoryProvider)
+                .setWatched(item, !watched);
+            ref.invalidate(continueWatchingProvider);
+            ref.invalidate(historyProvider);
+            ref.invalidate(moviesByCategoryProvider(cat));
+          },
+          icon: Icon(watched ? Icons.check_circle : Icons.check_circle_outline),
         ),
         const SizedBox(width: 10),
         IconButton.filledTonal(

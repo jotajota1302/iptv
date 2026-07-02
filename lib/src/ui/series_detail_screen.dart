@@ -2,11 +2,13 @@ import 'dart:ui';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../app/providers.dart';
 import '../app/theme.dart';
 import '../data/series_grouper.dart';
 import '../data/series_info_service.dart';
 import '../domain/series_group.dart';
+import '../domain/trailer_url.dart';
 import 'player_screen.dart';
 
 /// Detalle de una serie estilo cine: backdrop con degradado, ficha (sinopsis,
@@ -77,6 +79,19 @@ class _SeriesDetailScreenState extends ConsumerState<SeriesDetailScreen> {
                     _posterAndTitle(info),
                     const SizedBox(height: 14),
                     _chips(info),
+                    if (trailerUrl(info?.youtubeTrailer) != null) ...[
+                      const SizedBox(height: 10),
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: OutlinedButton.icon(
+                          icon: const Icon(Icons.ondemand_video, size: 18),
+                          label: const Text('Ver tráiler'),
+                          onPressed: () => launchUrl(
+                              Uri.parse(trailerUrl(info!.youtubeTrailer)!),
+                              mode: LaunchMode.externalApplication),
+                        ),
+                      ),
+                    ],
                     if (infoAsync.isLoading) ...[
                       const SizedBox(height: 14),
                       const _LoadingLine(),
@@ -232,6 +247,7 @@ class _SeriesDetailScreenState extends ConsumerState<SeriesDetailScreen> {
 
     return InkWell(
       onTap: () => _play(episodes, e),
+      onLongPress: () => _episodeSheet(e, watched),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 7),
         child: Row(
@@ -272,6 +288,41 @@ class _SeriesDetailScreenState extends ConsumerState<SeriesDetailScreen> {
                     .read(playlistRepositoryProvider)
                     .toggleFavorite(e.item);
                 ref.invalidate(favoritesProvider);
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Acciones del episodio (pulsación larga): marcar visto / no visto.
+  void _episodeSheet(Episode e, bool watched) {
+    showModalBottomSheet<void>(
+      context: context,
+      builder: (sheet) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: Icon(watched
+                  ? Icons.remove_done
+                  : Icons.check_circle_outline),
+              title: Text(watched
+                  ? 'Marcar como no visto'
+                  : 'Marcar como visto'),
+              onTap: () async {
+                Navigator.pop(sheet);
+                await ref
+                    .read(playlistRepositoryProvider)
+                    .setWatched(e.item, !watched);
+                ref.invalidate(continueWatchingProvider);
+                ref.invalidate(historyProvider);
+                if (e.item.groupTitle != null) {
+                  ref.invalidate(seriesGroupsByCategoryProvider(
+                      e.item.groupTitle!));
+                }
+                setState(() {});
               },
             ),
           ],

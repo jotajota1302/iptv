@@ -10,6 +10,7 @@ import '../domain/content_type.dart';
 import '../domain/media_item.dart';
 import '../domain/series_group.dart';
 import 'favorites_tab.dart';
+import 'history_screen.dart';
 import 'movie_detail_screen.dart';
 import 'play_helpers.dart';
 import 'series_detail_screen.dart';
@@ -106,6 +107,8 @@ class HomeTab extends ConsumerWidget {
   Widget _railContinue(BuildContext c, WidgetRef ref, List<MediaItem> items) {
     return ContentRail(
       title: 'Continuar viendo',
+      onSeeAll: () => Navigator.of(c).push(
+          MaterialPageRoute(builder: (_) => const HistoryScreen())),
       items: [
         for (final it in items)
           VodPoster(

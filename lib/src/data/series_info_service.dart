@@ -40,6 +40,7 @@ class SeriesApiInfo {
   final String? rating;
   final String? cover;
   final String? backdrop;
+  final String? youtubeTrailer;
   final Map<String, SeriesApiEpisode> episodesById;
   const SeriesApiInfo({
     this.plot,
@@ -50,6 +51,7 @@ class SeriesApiInfo {
     this.rating,
     this.cover,
     this.backdrop,
+    this.youtubeTrailer,
     this.episodesById = const {},
   });
 
@@ -202,6 +204,7 @@ SeriesApiInfo? parseSeriesInfo(Map<String, dynamic> json) {
     rating: _str(i, 'rating'),
     cover: _str(i, 'cover'),
     backdrop: _str(i, 'backdrop_path'),
+    youtubeTrailer: _str(i, 'youtube_trailer'),
     episodesById: episodes,
   );
 }

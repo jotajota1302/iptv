@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/legacy.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'fav_groups_controller.dart';
 import 'playlists_controller.dart';
 import 'reminders_controller.dart';
 import '../data/app_database.dart';
@@ -296,6 +297,16 @@ final xmltvGuideProvider = FutureProvider<XmltvGuide?>((ref) async {
 final remindersProvider =
     StateNotifierProvider<RemindersNotifier, List<Reminder>>(
         (ref) => RemindersNotifier(ref.watch(sharedPrefsProvider)));
+
+/// Grupos de favoritos personalizados (persistidos).
+final favGroupsProvider =
+    StateNotifierProvider<FavGroupsNotifier, Map<String, List<String>>>(
+        (ref) => FavGroupsNotifier(ref.watch(sharedPrefsProvider)));
+
+/// Historial de reproducción (más recientes primero).
+final historyProvider = FutureProvider<List<MediaItem>>((ref) {
+  return ref.watch(playlistRepositoryProvider).history();
+});
 
 /// Qué emiten ahora mismo los canales favoritos (máx. 12), para el rail
 /// "Ahora en tus canales" del Inicio. Best-effort: canales sin EPG se omiten.

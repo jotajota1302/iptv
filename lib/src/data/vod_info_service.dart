@@ -12,6 +12,7 @@ class VodInfo {
   final String? durationText;
   final String? cover;
   final String? backdrop;
+  final String? youtubeTrailer;
   const VodInfo({
     this.plot,
     this.cast,
@@ -22,6 +23,7 @@ class VodInfo {
     this.durationText,
     this.cover,
     this.backdrop,
+    this.youtubeTrailer,
   });
 
   bool get isEmpty =>
@@ -83,6 +85,7 @@ VodInfo? parseVodInfo(Map<String, dynamic> json) {
     durationText: str('duration'),
     cover: str('movie_image') ?? str('cover_big') ?? str('cover'),
     backdrop: str('backdrop_path'),
+    youtubeTrailer: str('youtube_trailer'),
   );
 }
 

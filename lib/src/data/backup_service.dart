@@ -20,6 +20,8 @@ const kBackupPrefsKeys = <String>[
   'pref_sub_lang',
   'start_last_channel',
   'last_channel',
+  'fav_groups',
+  'epg_reminders',
 ];
 
 /// Construye el JSON de la copia de seguridad: ajustes (prefs) + flags de
