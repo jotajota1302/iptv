@@ -147,12 +147,19 @@ class _SeriesDetailScreenState extends ConsumerState<SeriesDetailScreen> {
                 ),
               ),
             ),
+          // En pantallas anchas los episodios se reparten en 2-3 columnas
+          // en vez de dejar media fila vacía.
           SliverPadding(
             padding: const EdgeInsets.only(bottom: 24),
-            sliver: SliverList.builder(
-              itemCount: episodes.length,
-              itemBuilder: (_, i) =>
-                  _episodeTile(episodes, episodes[i], info),
+            sliver: SliverGrid(
+              gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+                maxCrossAxisExtent: 700,
+                mainAxisExtent: 92,
+              ),
+              delegate: SliverChildBuilderDelegate(
+                (_, i) => _episodeTile(episodes, episodes[i], info),
+                childCount: episodes.length,
+              ),
             ),
           ),
         ],

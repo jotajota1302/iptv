@@ -423,8 +423,12 @@ class _SettingsTabState extends ConsumerState<SettingsTab> {
     final deinterlace = ref.watch(deinterlaceProvider);
     final playlists = ref.watch(playlistsProvider);
 
+    // En pantallas anchas los ajustes se leen mejor en una columna centrada
+    // (~860px) que estirados a todo el ancho.
+    final width = MediaQuery.of(context).size.width;
+    final hPad = width > 892 ? (width - 860) / 2 : 16.0;
     return ListView(
-      padding: const EdgeInsets.all(16),
+      padding: EdgeInsets.symmetric(vertical: 16, horizontal: hPad),
       children: [
         // --- Mis listas ---
         const Text('Mis listas', style: TextStyle(fontSize: 20)),

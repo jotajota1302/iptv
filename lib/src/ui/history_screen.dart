@@ -6,6 +6,7 @@ import '../app/theme.dart';
 import '../domain/content_type.dart';
 import '../domain/media_item.dart';
 import 'play_helpers.dart';
+import 'widgets/row_grid.dart';
 
 /// Historial de reproducción: todo lo visto (o empezado), más reciente
 /// primero, con progreso y acciones para marcar visto o restablecer.
@@ -39,8 +40,9 @@ class HistoryScreen extends ConsumerWidget {
                 child: Text('Aún no has reproducido nada',
                     style: TextStyle(color: Colors.white54)));
           }
-          return ListView.builder(
+          return RowGrid(
             itemCount: items.length,
+            tileHeight: 68,
             itemBuilder: (_, i) {
               final it = items[i];
               final frac = it.watchedFraction.toDouble();

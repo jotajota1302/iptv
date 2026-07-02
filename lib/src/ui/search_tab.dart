@@ -9,6 +9,7 @@ import '../domain/media_item.dart';
 import '../domain/series_group.dart';
 import 'movie_detail_screen.dart';
 import 'play_helpers.dart';
+import 'widgets/row_grid.dart';
 
 class SearchTab extends ConsumerWidget {
   const SearchTab({super.key});
@@ -137,35 +138,55 @@ class SearchTab extends ConsumerWidget {
                     for (final i in filtered)
                       if (i.type == ContentType.series) i
                   ]);
+                  // Cada sección en columnas responsivas (RowGrid) para no
+                  // desperdiciar el ancho en escritorio.
                   return ListView(
                     children: [
                       if (tv.isNotEmpty) ...[
                         _section('TV', tv.length),
-                        for (final it in tv)
-                          ListTile(
-                            leading: _thumb(it),
-                            title: Text(it.name),
-                            subtitle: Text(it.groupTitle ?? ''),
-                            onTap: () => openPlayer(context, it),
+                        RowGrid(
+                          shrinkWrap: true,
+                          itemCount: tv.length,
+                          tileHeight: 62,
+                          itemBuilder: (_, i) => ListTile(
+                            leading: _thumb(tv[i]),
+                            title: Text(tv[i].name,
+                                maxLines: 1, overflow: TextOverflow.ellipsis),
+                            subtitle: Text(tv[i].groupTitle ?? '',
+                                maxLines: 1, overflow: TextOverflow.ellipsis),
+                            onTap: () => openPlayer(context, tv[i]),
                           ),
+                        ),
                       ],
                       if (movies.isNotEmpty) ...[
                         _section('Películas', movies.length),
-                        for (final it in movies)
-                          ListTile(
-                            leading: _thumb(it),
-                            title: Text(it.name),
-                            subtitle: Text(it.groupTitle ?? ''),
+                        RowGrid(
+                          shrinkWrap: true,
+                          itemCount: movies.length,
+                          tileHeight: 62,
+                          itemBuilder: (_, i) => ListTile(
+                            leading: _thumb(movies[i]),
+                            title: Text(movies[i].name,
+                                maxLines: 1, overflow: TextOverflow.ellipsis),
+                            subtitle: Text(movies[i].groupTitle ?? '',
+                                maxLines: 1, overflow: TextOverflow.ellipsis),
                             onTap: () => Navigator.of(context).push(
                               MaterialPageRoute(
                                   builder: (_) =>
-                                      MovieDetailScreen(item: it)),
+                                      MovieDetailScreen(item: movies[i])),
                             ),
                           ),
+                        ),
                       ],
                       if (seriesGroups.isNotEmpty) ...[
                         _section('Series', seriesGroups.length),
-                        for (final g in seriesGroups) _seriesRow(context, ref, g),
+                        RowGrid(
+                          shrinkWrap: true,
+                          itemCount: seriesGroups.length,
+                          tileHeight: 62,
+                          itemBuilder: (_, i) =>
+                              _seriesRow(context, ref, seriesGroups[i]),
+                        ),
                       ],
                     ],
                   );

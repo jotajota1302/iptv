@@ -13,6 +13,7 @@ import 'channel_guide_screen.dart';
 import 'epg_grid_screen.dart';
 import 'player_screen.dart';
 import 'sort_menu.dart';
+import 'widgets/row_grid.dart';
 
 /// Ancho mínimo para mostrar el panel de preview lateral.
 const _kPreviewBreakpoint = 820.0;
@@ -352,9 +353,11 @@ class _ChannelListScreenState extends ConsumerState<ChannelListScreen> {
       '${d.hour.toString().padLeft(2, '0')}:${d.minute.toString().padLeft(2, '0')}';
 
   Widget _buildList(BuildContext context, List<MediaItem> items, bool wide) {
-    return ListView.builder(
+    return RowGrid(
       controller: _scroll,
       itemCount: items.length,
+      maxTileWidth: 560,
+      tileHeight: 58,
       itemBuilder: (_, i) {
         final it = items[i];
         return ListTile(
@@ -373,7 +376,7 @@ class _ChannelListScreenState extends ConsumerState<ChannelListScreen> {
               _logo(it),
             ],
           ),
-          title: Text(it.name),
+          title: Text(it.name, maxLines: 1, overflow: TextOverflow.ellipsis),
           trailing: Row(
             mainAxisSize: MainAxisSize.min,
             children: [

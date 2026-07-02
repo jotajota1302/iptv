@@ -8,6 +8,7 @@ import '../domain/media_item.dart';
 import 'channel_list_screen.dart';
 import 'player_screen.dart';
 import 'widgets/category_tile.dart';
+import 'widgets/row_grid.dart';
 
 class LiveTab extends ConsumerStatefulWidget {
   const LiveTab({super.key});
@@ -116,15 +117,19 @@ class _LiveTabState extends ConsumerState<LiveTab> {
               child: Text('Sin resultados',
                   style: TextStyle(color: Colors.white54)));
         }
-        return ListView.builder(
+        return RowGrid(
           itemCount: items.length,
+          tileHeight: 62,
           itemBuilder: (_, i) {
             final it = items[i];
             return ListTile(
               leading: _logo(it),
-              title: Text(it.name),
-              subtitle:
-                  it.groupTitle != null ? Text(it.groupTitle!) : null,
+              title: Text(it.name, maxLines: 1,
+                  overflow: TextOverflow.ellipsis),
+              subtitle: it.groupTitle != null
+                  ? Text(it.groupTitle!,
+                      maxLines: 1, overflow: TextOverflow.ellipsis)
+                  : null,
               onTap: () => Navigator.of(context).push(MaterialPageRoute(
                 builder: (_) =>
                     PlayerScreen(item: it, queue: items, queueIndex: i),
@@ -170,8 +175,9 @@ class _LiveTabState extends ConsumerState<LiveTab> {
       );
 
   Widget _buildList(List<Category> cats) {
-    return ListView.builder(
+    return RowGrid(
       itemCount: cats.length,
+      tileHeight: 68,
       itemBuilder: (_, i) {
         final cat = cats[i];
         return CategoryTile(

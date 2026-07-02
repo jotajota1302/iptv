@@ -8,6 +8,7 @@ import 'movie_detail_screen.dart';
 import 'movie_grid_screen.dart';
 import 'vod_poster.dart';
 import 'widgets/category_tile.dart';
+import 'widgets/row_grid.dart';
 import 'widgets/vod_category_card.dart';
 
 class MoviesTab extends ConsumerStatefulWidget {
@@ -102,14 +103,18 @@ class _MoviesTabState extends ConsumerState<MoviesTab> {
                       children: [
                         const ContinueWatchingRow(type: ContentType.movie),
                         if (!grid)
-                          for (final cat in cats)
-                            CategoryTile(
+                          RowGrid(
+                            shrinkWrap: true,
+                            itemCount: cats.length,
+                            tileHeight: 68,
+                            itemBuilder: (_, i) => CategoryTile(
                               icon: Icons.movie_outlined,
-                              name: cat.name,
-                              count: cat.itemCount,
-                              onTap: () => _open(cat),
-                              onHide: () => _hide(cat),
-                            )
+                              name: cats[i].name,
+                              count: cats[i].itemCount,
+                              onTap: () => _open(cats[i]),
+                              onHide: () => _hide(cats[i]),
+                            ),
+                          )
                         else
                           _grid(cats),
                       ],

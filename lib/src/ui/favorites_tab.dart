@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../app/providers.dart';
 import '../domain/content_type.dart';
 import 'play_helpers.dart';
+import 'widgets/row_grid.dart';
 
 /// Favoritos con grupos personalizados: chips para filtrar por grupo, y
 /// gestión de a qué grupos pertenece cada favorito.
@@ -147,8 +148,9 @@ class _FavoritesTabState extends ConsumerState<FavoritesTab> {
                   ? const Center(
                       child: Text('Este grupo está vacío',
                           style: TextStyle(color: Colors.white54)))
-                  : ListView.builder(
+                  : RowGrid(
                       itemCount: items.length,
+                      tileHeight: 68,
                       itemBuilder: (_, i) {
                         final it = items[i];
                         final icon = switch (it.type) {
@@ -158,9 +160,12 @@ class _FavoritesTabState extends ConsumerState<FavoritesTab> {
                         };
                         return ListTile(
                           leading: Icon(icon),
-                          title: Text(it.name),
+                          title: Text(it.name,
+                              maxLines: 1, overflow: TextOverflow.ellipsis),
                           subtitle: it.groupTitle != null
-                              ? Text(it.groupTitle!)
+                              ? Text(it.groupTitle!,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis)
                               : null,
                           trailing: PopupMenuButton<String>(
                             onSelected: (a) async {
