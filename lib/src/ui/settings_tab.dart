@@ -26,6 +26,7 @@ class _SettingsTabState extends ConsumerState<SettingsTab> {
   final _nameCtrl = TextEditingController();
   final _userCtrl = TextEditingController();
   final _passCtrl = TextEditingController();
+  final _serverCtrl = TextEditingController();
   late final _tmdbCtrl = TextEditingController(text: ref.read(tmdbKeyProvider));
   bool _loading = false;
 
@@ -35,8 +36,27 @@ class _SettingsTabState extends ConsumerState<SettingsTab> {
     _nameCtrl.dispose();
     _userCtrl.dispose();
     _passCtrl.dispose();
+    _serverCtrl.dispose();
     _tmdbCtrl.dispose();
     super.dispose();
+  }
+
+  /// Añade una cuenta Xtream (servidor + usuario + contraseña) sin que el
+  /// usuario tenga que saber montar la URL get.php.
+  Future<void> _addXtream() async {
+    final server = _serverCtrl.text.trim();
+    final user = _userCtrl.text.trim();
+    final pass = _passCtrl.text;
+    if (server.isEmpty || user.isEmpty || pass.isEmpty) return;
+    final url = buildXtreamListUrl(server, user, pass);
+    final host = Uri.tryParse(url)?.host ?? 'Xtream';
+    ref.read(playlistsProvider.notifier).add(SavedPlaylist(
+          id: DateTime.now().microsecondsSinceEpoch.toString(),
+          name: host,
+          url: url,
+        ));
+    _passCtrl.clear();
+    await _run(() => ref.read(playlistRepositoryProvider).loadFromUrl(url));
   }
 
   void _saveTmdbKey() {
@@ -573,6 +593,58 @@ class _SettingsTabState extends ConsumerState<SettingsTab> {
               child: const Text('Elegir archivo'),
             ),
           ]),
+          const SizedBox(height: 20),
+          // Alta con cuenta Xtream: como Smarters/TiviMate, sin URLs.
+          const Text('…o con cuenta Xtream',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+          const SizedBox(height: 4),
+          const Text(
+              'Los datos que te da tu proveedor: servidor, usuario y '
+              'contraseña. La app monta la lista sola.',
+              style: TextStyle(color: Colors.white54, fontSize: 12.5)),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _serverCtrl,
+            decoration: const InputDecoration(
+              labelText: 'Servidor (http://host:puerto)',
+              prefixIcon: Icon(Icons.dns_outlined),
+              isDense: true,
+              border: OutlineInputBorder(),
+            ),
+          ),
+          const SizedBox(height: 10),
+          Row(children: [
+            Expanded(
+              child: TextField(
+                controller: _userCtrl,
+                decoration: const InputDecoration(
+                  labelText: 'Usuario',
+                  prefixIcon: Icon(Icons.person_outline),
+                  isDense: true,
+                  border: OutlineInputBorder(),
+                ),
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: TextField(
+                controller: _passCtrl,
+                obscureText: true,
+                decoration: const InputDecoration(
+                  labelText: 'Contraseña',
+                  prefixIcon: Icon(Icons.lock_outline),
+                  isDense: true,
+                  border: OutlineInputBorder(),
+                ),
+              ),
+            ),
+          ]),
+          const SizedBox(height: 10),
+          FilledButton.icon(
+            onPressed: _loading ? null : _addXtream,
+            icon: const Icon(Icons.login),
+            label: const Text('Conectar y cargar'),
+          ),
         ],
         const SizedBox(height: 16),
         const Text('Gestionar (ocultar / borrar)',
@@ -726,6 +798,52 @@ class _SettingsTabState extends ConsumerState<SettingsTab> {
                         ? const Icon(Icons.check,
                             size: 18, color: Colors.white)
                         : null,
+                  ),
+                ),
+              ),
+          ],
+        ),
+        const SizedBox(height: 16),
+        const Text('Estilo',
+            style: TextStyle(fontSize: 13, color: Colors.white54)),
+        const SizedBox(height: 10),
+        // Selector de estilo global: tarjetita con muestra de fondo/superficie.
+        Wrap(
+          spacing: 10,
+          runSpacing: 10,
+          children: [
+            for (var i = 0; i < kThemeStyles.length; i++)
+              InkWell(
+                borderRadius: BorderRadius.circular(12),
+                onTap: () => setThemeStyle(ref, i),
+                child: Container(
+                  width: 108,
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: kThemeStyles[i].$2,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: ref.watch(themeStyleProvider) == i
+                          ? kAccent
+                          : Colors.white12,
+                      width: ref.watch(themeStyleProvider) == i ? 2 : 1,
+                    ),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Container(
+                        height: 22,
+                        decoration: BoxDecoration(
+                          color: kThemeStyles[i].$3,
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Text(kThemeStyles[i].$1,
+                          style: const TextStyle(
+                              fontSize: 12, color: Colors.white70)),
+                    ],
                   ),
                 ),
               ),

@@ -306,13 +306,13 @@ class _Backdrop extends StatelessWidget {
           _blurredPoster(poster)
         else
           Container(color: kSurfaceHigh),
-        const DecoratedBox(
+        DecoratedBox(
           decoration: BoxDecoration(
             gradient: LinearGradient(
               begin: Alignment.topCenter,
               end: Alignment.bottomCenter,
-              colors: [Color(0x22000000), kBackground],
-              stops: [0.35, 1.0],
+              colors: [const Color(0x22000000), kBackground],
+              stops: const [0.35, 1.0],
             ),
           ),
         ),

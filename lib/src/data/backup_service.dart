@@ -15,6 +15,7 @@ const kBackupPrefsKeys = <String>[
   'vod_category_grid',
   'channel_tile_size',
   'accent_color',
+  'theme_style',
   'auto_refresh',
   'hide_duplicates',
   'pref_audio_lang',

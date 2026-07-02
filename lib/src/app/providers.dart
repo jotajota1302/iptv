@@ -250,6 +250,18 @@ void setAccentIndex(WidgetRef ref, int index) {
   ref.read(sharedPrefsProvider).setInt('accent_color', index);
 }
 
+/// Estilo global de la interfaz (índice en kThemeStyles). Persistido.
+final themeStyleProvider = StateProvider<int>((ref) =>
+    (ref.watch(sharedPrefsProvider).getInt('theme_style') ?? 0)
+        .clamp(0, kThemeStyles.length - 1));
+
+/// Cambia el estilo: actualiza la paleta global y reconstruye el tema.
+void setThemeStyle(WidgetRef ref, int index) {
+  applyThemeStyle(index);
+  ref.read(themeStyleProvider.notifier).state = index;
+  ref.read(sharedPrefsProvider).setInt('theme_style', index);
+}
+
 /// Recargar la lista activa automáticamente al arrancar la app. Persistido.
 final autoRefreshProvider = StateProvider<bool>(
     (ref) => ref.watch(sharedPrefsProvider).getBool('auto_refresh') ?? true);

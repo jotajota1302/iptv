@@ -11,13 +11,32 @@ const kAccentChoices = <(String, Color)>[
   ('Rojo', Color(0xFFFF5252)),
 ];
 
-/// Paleta y tema de la app. Cambiar [kAccent] (+ reconstruir MaterialApp)
-/// recolorea toda la interfaz. Mutable a propósito: lo fija el selector de
-/// acento; el resto del código lo trata como constante de solo lectura.
+/// Estilos globales de la interfaz: (nombre, fondo, superficie, superficie
+/// alta). Todos oscuros: la UI usa textos blancos fijos por todas partes, así
+/// que un tema claro sería otra liga; estos varían la "temperatura" del negro.
+const kThemeStyles = <(String, Color, Color, Color)>[
+  ('Oscuro', Color(0xFF0D0E12), Color(0xFF15161C), Color(0xFF1E2029)),
+  ('Negro puro', Color(0xFF000000), Color(0xFF0B0B0F), Color(0xFF15151B)),
+  ('Medianoche', Color(0xFF0A111F), Color(0xFF101A2C), Color(0xFF19273F)),
+  ('Grafito', Color(0xFF17191D), Color(0xFF1F2227), Color(0xFF2A2E35)),
+];
+
+/// Paleta y tema de la app. Cambiar [kAccent] o el estilo (+ reconstruir
+/// MaterialApp) recolorea toda la interfaz. Mutables a propósito: los fijan
+/// los selectores de Ajustes; el resto del código los trata como constantes
+/// de solo lectura.
 Color kAccent = const Color(0xFF7C4DFF); // violeta cinematográfico
-const Color kBackground = Color(0xFF0D0E12); // casi negro (AMOLED-friendly)
-const Color kSurface = Color(0xFF15161C);
-const Color kSurfaceHigh = Color(0xFF1E2029);
+Color kBackground = const Color(0xFF0D0E12); // casi negro (AMOLED-friendly)
+Color kSurface = const Color(0xFF15161C);
+Color kSurfaceHigh = const Color(0xFF1E2029);
+
+/// Aplica un estilo global de [kThemeStyles] a las variables de paleta.
+void applyThemeStyle(int index) {
+  final s = kThemeStyles[index.clamp(0, kThemeStyles.length - 1)];
+  kBackground = s.$2;
+  kSurface = s.$3;
+  kSurfaceHigh = s.$4;
+}
 
 /// Tema oscuro premium: superficies casi negras, acento violeta, tarjetas
 /// redondeadas con profundidad sutil y tipografía jerarquizada.
@@ -66,7 +85,7 @@ ThemeData buildAppTheme() {
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
     ),
     navigationBarTheme: NavigationBarThemeData(
-      backgroundColor: const Color(0xFF101119),
+      backgroundColor: kSurface,
       indicatorColor: kAccent.withValues(alpha: 0.22),
       elevation: 0,
       labelTextStyle: WidgetStateProperty.all(
@@ -74,7 +93,7 @@ ThemeData buildAppTheme() {
       ),
     ),
     navigationRailTheme: NavigationRailThemeData(
-      backgroundColor: const Color(0xFF101119),
+      backgroundColor: kSurface,
       indicatorColor: kAccent.withValues(alpha: 0.22),
       selectedIconTheme: IconThemeData(color: kAccent),
       selectedLabelTextStyle:

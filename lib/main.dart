@@ -34,6 +34,8 @@ Future<void> main(List<String> args) async {
   kAccent = accentPref != null
       ? kAccentChoices[accentPref.clamp(0, kAccentChoices.length - 1)].$2
       : (Brand.accent ?? kAccent);
+  // Estilo global (fondo/superficies) elegido en Ajustes.
+  applyThemeStyle(prefs.getInt('theme_style') ?? 0);
   // Modo visor: lanzado con `--play <url>` desde la ventana principal, esta
   // instancia es solo una ventana de reproducción independiente.
   final viewer = parseViewerArgs(args);
@@ -70,8 +72,9 @@ class IptvApp extends ConsumerWidget {
   const IptvApp({super.key});
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // Al cambiar el acento en Ajustes se reconstruye el tema entero.
+    // Al cambiar el acento o el estilo en Ajustes se reconstruye el tema.
     ref.watch(accentIndexProvider);
+    ref.watch(themeStyleProvider);
     return MaterialApp(
       title: Brand.name,
       debugShowCheckedModeBanner: false,
