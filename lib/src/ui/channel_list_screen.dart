@@ -31,6 +31,10 @@ class _ChannelListScreenState extends ConsumerState<ChannelListScreen> {
   final _scroll = ScrollController();
   bool _showToTop = false;
 
+  /// Canales tal y como se muestran (ya ordenados): es la cola de zapping
+  /// que se pasa al reproductor a pantalla completa.
+  List<MediaItem> _visibleItems = const [];
+
   @override
   void initState() {
     super.initState();
@@ -67,12 +71,20 @@ class _ChannelListScreenState extends ConsumerState<ChannelListScreen> {
   }
 
   /// Abre el canal en pantalla completa. Pausa el preview antes (evita audio
-  /// doble) y lo deja parado al volver: nada sigue sonando al salir.
+  /// doble) y lo deja parado al volver: nada sigue sonando al salir. Se pasa
+  /// la lista visible como cola para poder hacer zapping (canal ant./sig.).
   Future<void> _fullscreen(MediaItem it) async {
     await _previewCtrl?.pause();
     if (!mounted) return;
+    final idx = _visibleItems.indexWhere((e) => e.id == it.id);
     await Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => PlayerScreen(item: it)),
+      MaterialPageRoute(
+        builder: (_) => PlayerScreen(
+          item: it,
+          queue: idx >= 0 ? _visibleItems : null,
+          queueIndex: idx >= 0 ? idx : 0,
+        ),
+      ),
     );
   }
 
@@ -175,6 +187,7 @@ class _ChannelListScreenState extends ConsumerState<ChannelListScreen> {
         data: (all) => LayoutBuilder(
           builder: (context, constraints) {
             final items = sortItems(all, sort);
+            _visibleItems = items;
             final wide = constraints.maxWidth >= _kPreviewBreakpoint;
             final content = grid
                 ? _buildGrid(context, items, wide)
@@ -283,17 +296,42 @@ class _ChannelListScreenState extends ConsumerState<ChannelListScreen> {
           itemCount: entries.length,
           itemBuilder: (_, i) {
             final e = entries[i];
-            final now = i == 0;
+            final now = DateTime.now();
+            final current = !now.isBefore(e.start) && now.isBefore(e.end);
+            final weight = current ? FontWeight.bold : FontWeight.normal;
             return ListTile(
               dense: true,
               contentPadding: EdgeInsets.zero,
-              leading: Text(_hhmm(e.start),
-                  style: TextStyle(
-                      fontWeight: now ? FontWeight.bold : FontWeight.normal)),
-              title: Text(e.title,
-                  style: TextStyle(
-                      fontWeight: now ? FontWeight.bold : FontWeight.normal)),
-              subtitle: now ? const Text('Ahora') : null,
+              leading: Text(_hhmm(e.start), style: TextStyle(fontWeight: weight)),
+              title: Text(e.title, style: TextStyle(fontWeight: weight)),
+              // El programa en emisión muestra su avance y cuándo termina.
+              subtitle: current
+                  ? Padding(
+                      padding: const EdgeInsets.only(top: 5),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(3),
+                            child: LinearProgressIndicator(
+                              value: (now.difference(e.start).inSeconds /
+                                      e.end
+                                          .difference(e.start)
+                                          .inSeconds
+                                          .clamp(1, 1 << 31))
+                                  .clamp(0.0, 1.0),
+                              minHeight: 4,
+                              backgroundColor: Colors.white12,
+                            ),
+                          ),
+                          const SizedBox(height: 3),
+                          Text('Hasta las ${_hhmm(e.end)}',
+                              style: const TextStyle(
+                                  fontSize: 11, color: Colors.white54)),
+                        ],
+                      ),
+                    )
+                  : null,
             );
           },
         );

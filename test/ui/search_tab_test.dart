@@ -41,8 +41,9 @@ void main() {
     expect(find.text('Canal Uno'), findsOneWidget);
     expect(find.text('Peli Dos'), findsOneWidget);
 
-    // Filtrar por Películas oculta el canal en directo.
-    await tester.tap(find.text('Películas'));
+    // Filtrar por Películas oculta el canal en directo. Se pulsa el chip de
+    // filtro (el texto "Películas" también existe como cabecera de sección).
+    await tester.tap(find.widgetWithText(ChoiceChip, 'Películas'));
     await tester.pumpAndSettle();
     expect(find.text('Canal Uno'), findsNothing);
     expect(find.text('Peli Dos'), findsOneWidget);

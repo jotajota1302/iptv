@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:media_kit_video/media_kit_video.dart';
 import '../app/providers.dart';
+import '../data/epg_service.dart';
 import '../domain/content_type.dart';
 import '../domain/media_item.dart';
 import '../player/media_kit_player_controller.dart';
@@ -54,12 +55,19 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
   List<AudioTrack> _audioTracks = [];
   List<SubtitleTrack> _subtitleTracks = [];
 
+  // OSD (nombre del canal + programa actual) al entrar en un canal.
+  bool _osdVisible = false;
+  Timer? _osdTimer;
+
+  bool get _isLive => widget.item.type == ContentType.live;
+
   @override
   void initState() {
     super.initState();
     final hwAccel = ref.read(hardwareAccelProvider);
     final isVod = widget.item.type == ContentType.movie ||
         widget.item.type == ContentType.series;
+    if (_isLive) _showOsd();
     // VOD es progresivo (no entrelazado): sin bwdif y con búfer amplio para 4K.
     // TV en directo respeta el ajuste de desentrelazado.
     final deinterlace = isVod ? false : ref.read(deinterlaceProvider);
@@ -187,6 +195,10 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
       _toggleMute();
     } else if (k == LogicalKeyboardKey.keyN && _hasNext) {
       _playNext();
+    } else if (k == LogicalKeyboardKey.pageDown && _hasNext) {
+      _playAt(widget.queueIndex + 1);
+    } else if (k == LogicalKeyboardKey.pageUp && _hasPrev) {
+      _playAt(widget.queueIndex - 1);
     } else {
       return KeyEventResult.ignored;
     }
@@ -196,28 +208,35 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
   bool get _hasNext =>
       widget.queue != null && widget.queueIndex + 1 < widget.queue!.length;
 
-  /// Pasa al siguiente elemento de la cola (episodio). Marca el actual como
-  /// visto y reemplaza la pantalla para reutilizar toda la lógica.
+  bool get _hasPrev => widget.queue != null && widget.queueIndex > 0;
+
+  /// Salta al elemento [index] de la cola (zapping de canal o cambio de
+  /// episodio) reemplazando la pantalla para reutilizar toda la lógica.
+  void _playAt(int index) {
+    if (_advanced) return;
+    final q = widget.queue;
+    if (q == null || index < 0 || index >= q.length) return;
+    _advanced = true;
+    Navigator.of(context).pushReplacement(MaterialPageRoute(
+      builder: (_) => PlayerScreen(
+        item: q[index],
+        resume: widget.resume,
+        queue: q,
+        queueIndex: index,
+        viewerWindow: widget.viewerWindow,
+      ),
+    ));
+  }
+
+  /// Pasa al siguiente elemento de la cola. En VOD marca el actual como visto.
   void _playNext() {
     if (_advanced || !_hasNext) return;
-    _advanced = true;
-    final q = widget.queue!;
-    final next = widget.queueIndex + 1;
-    // Marca el episodio actual como terminado.
-    if (_duration.inSeconds > 0) {
+    if (widget.resume && _duration.inSeconds > 0) {
       ref.read(playlistRepositoryProvider).saveProgress(
           widget.item.id, _duration.inSeconds,
           duration: _duration.inSeconds);
     }
-    if (!mounted) return;
-    Navigator.of(context).pushReplacement(MaterialPageRoute(
-      builder: (_) => PlayerScreen(
-        item: q[next],
-        resume: true,
-        queue: q,
-        queueIndex: next,
-      ),
-    ));
+    _playAt(widget.queueIndex + 1);
   }
 
   String _audioLabel(AudioTrack t) {
@@ -234,8 +253,81 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     return parts.isEmpty ? 'Sub ${t.id}' : parts.join(' · ');
   }
 
+  /// Muestra el OSD (canal + programa actual) y lo oculta a los 5 segundos.
+  void _showOsd() {
+    _osdVisible = true;
+    _osdTimer?.cancel();
+    _osdTimer = Timer(const Duration(seconds: 5), () {
+      if (mounted) setState(() => _osdVisible = false);
+    });
+  }
+
+  /// Contenido del OSD: nombre del canal y, si hay EPG, el programa en
+  /// emisión con su franja y avance.
+  Widget _osd() {
+    EpgEntry? current;
+    if (_isLive) {
+      final entries =
+          ref.watch(previewEpgProvider(widget.item.streamUrl)).value ??
+              const <EpgEntry>[];
+      final now = DateTime.now();
+      for (final e in entries) {
+        if (!now.isBefore(e.start) && now.isBefore(e.end)) {
+          current = e;
+          break;
+        }
+      }
+    }
+    String hhmm(DateTime d) =>
+        '${d.hour.toString().padLeft(2, '0')}:${d.minute.toString().padLeft(2, '0')}';
+    final now = DateTime.now();
+    return Container(
+      constraints: const BoxConstraints(maxWidth: 440),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        color: Colors.black.withValues(alpha: 0.72),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(widget.item.name,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style:
+                  const TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
+          if (current != null) ...[
+            const SizedBox(height: 4),
+            Text(
+                '${hhmm(current.start)}–${hhmm(current.end)}  ${current.title}',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style:
+                    const TextStyle(fontSize: 13, color: Colors.white70)),
+            const SizedBox(height: 6),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(3),
+              child: LinearProgressIndicator(
+                value: (now.difference(current.start).inSeconds /
+                        current.end
+                            .difference(current.start)
+                            .inSeconds
+                            .clamp(1, 1 << 31))
+                    .clamp(0.0, 1.0),
+                minHeight: 4,
+                backgroundColor: Colors.white24,
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
   @override
   void dispose() {
+    _osdTimer?.cancel();
     // 1) Cortar el audio LO PRIMERO, pase lo que pase con el resto.
     final ctrl = _ctrl;
     ctrl.player.setVolume(0);
@@ -254,10 +346,17 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
 
   List<Widget> _trackActions() {
     final actions = <Widget>[];
+    if (_isLive && _hasPrev) {
+      actions.add(IconButton(
+        icon: const Icon(Icons.skip_previous),
+        tooltip: 'Canal anterior (Re Pág)',
+        onPressed: () => _playAt(widget.queueIndex - 1),
+      ));
+    }
     if (_hasNext) {
       actions.add(IconButton(
         icon: const Icon(Icons.skip_next),
-        tooltip: 'Siguiente episodio',
+        tooltip: _isLive ? 'Canal siguiente (Av Pág)' : 'Siguiente episodio',
         onPressed: _playNext,
       ));
     }
@@ -309,6 +408,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
                 Text('↑ / ↓ — Subir · Bajar volumen'),
                 Text('M — Silenciar'),
                 Text('N — Siguiente episodio'),
+                Text('Re Pág / Av Pág — Canal · Episodio anterior / siguiente'),
               ],
             ),
             actions: [
@@ -337,8 +437,25 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
       body: Focus(
         autofocus: true,
         onKeyEvent: _onKey,
-        child: Center(
-          child: Video(controller: _video, fit: BoxFit.contain),
+        child: Stack(
+          children: [
+            Center(
+              child: Video(controller: _video, fit: BoxFit.contain),
+            ),
+            // OSD de canal (nombre + programa actual), se desvanece solo.
+            if (_isLive)
+              Positioned(
+                left: 16,
+                bottom: 16,
+                child: IgnorePointer(
+                  child: AnimatedOpacity(
+                    opacity: _osdVisible ? 1 : 0,
+                    duration: const Duration(milliseconds: 350),
+                    child: _osd(),
+                  ),
+                ),
+              ),
+          ],
         ),
       ),
     );

@@ -6,6 +6,8 @@ import '../app/theme.dart';
 import '../data/series_grouper.dart';
 import '../domain/content_type.dart';
 import '../domain/media_item.dart';
+import '../domain/series_group.dart';
+import 'movie_detail_screen.dart';
 import 'play_helpers.dart';
 import 'series_detail_screen.dart';
 
@@ -47,6 +49,34 @@ class SearchTab extends ConsumerWidget {
       }
     }
     if (context.mounted) openPlayer(context, it);
+  }
+
+  Widget _section(String title, int count) => Padding(
+        padding: const EdgeInsets.fromLTRB(16, 14, 16, 4),
+        child: Row(
+          children: [
+            Text(title,
+                style:
+                    const TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
+            const SizedBox(width: 8),
+            Text('$count',
+                style: const TextStyle(fontSize: 13, color: Colors.white38)),
+          ],
+        ),
+      );
+
+  /// Fila de serie agrupada: una entrada por serie (no una por episodio).
+  Widget _seriesRow(BuildContext context, WidgetRef ref, SeriesGroup g) {
+    final anyEpisode =
+        g.seasons[g.sortedSeasons.first]!.first.item;
+    return ListTile(
+      leading: _thumb(anyEpisode),
+      title: Text(g.title),
+      subtitle: Text('${g.sortedSeasons.length} temporada(s) · '
+          '${g.episodeCount} episodio(s) encontrados'),
+      trailing: const Icon(Icons.chevron_right, color: Colors.white38),
+      onTap: () => _openResult(context, ref, anyEpisode),
+    );
   }
 
   Widget _thumb(MediaItem it) {
@@ -118,21 +148,51 @@ class SearchTab extends ConsumerWidget {
                   if (filtered.isEmpty) {
                     return const _SearchEmpty();
                   }
-                  return ListView.builder(
-                    itemCount: filtered.length,
-                    itemBuilder: (_, i) {
-                      final MediaItem it = filtered[i];
-                      return ListTile(
-                        leading: _thumb(it),
-                        title: Text(it.name),
-                        subtitle: Text(it.groupTitle ?? ''),
-                        trailing: it.type == ContentType.series
-                            ? const Icon(Icons.chevron_right,
-                                color: Colors.white38)
-                            : null,
-                        onTap: () => _openResult(context, ref, it),
-                      );
-                    },
+                  // Secciones por tipo; los episodios de series se agrupan en
+                  // una sola fila por serie para poder navegar por temporadas.
+                  final tv = [
+                    for (final i in filtered)
+                      if (i.type == ContentType.live) i
+                  ];
+                  final movies = [
+                    for (final i in filtered)
+                      if (i.type == ContentType.movie) i
+                  ];
+                  final seriesGroups = groupSeries([
+                    for (final i in filtered)
+                      if (i.type == ContentType.series) i
+                  ]);
+                  return ListView(
+                    children: [
+                      if (tv.isNotEmpty) ...[
+                        _section('TV', tv.length),
+                        for (final it in tv)
+                          ListTile(
+                            leading: _thumb(it),
+                            title: Text(it.name),
+                            subtitle: Text(it.groupTitle ?? ''),
+                            onTap: () => openPlayer(context, it),
+                          ),
+                      ],
+                      if (movies.isNotEmpty) ...[
+                        _section('Películas', movies.length),
+                        for (final it in movies)
+                          ListTile(
+                            leading: _thumb(it),
+                            title: Text(it.name),
+                            subtitle: Text(it.groupTitle ?? ''),
+                            onTap: () => Navigator.of(context).push(
+                              MaterialPageRoute(
+                                  builder: (_) =>
+                                      MovieDetailScreen(item: it)),
+                            ),
+                          ),
+                      ],
+                      if (seriesGroups.isNotEmpty) ...[
+                        _section('Series', seriesGroups.length),
+                        for (final g in seriesGroups) _seriesRow(context, ref, g),
+                      ],
+                    ],
                   );
                 },
               ),
