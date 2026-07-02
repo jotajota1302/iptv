@@ -75,6 +75,23 @@ final searchQueryProvider = StateProvider<String>((_) => '');
 /// Filtro de tipo en la búsqueda (null = todos).
 final searchFilterProvider = StateProvider<ContentType?>((_) => null);
 
+/// Búsqueda dentro de un tipo concreto (buscadores de Películas y Series).
+typedef TypeQuery = ({ContentType type, String query});
+
+final searchByTypeProvider =
+    FutureProvider.family<List<MediaItem>, TypeQuery>((ref, k) async {
+  final q = k.query.trim();
+  if (q.isEmpty) return const [];
+  final all = await ref.watch(playlistRepositoryProvider).search(q);
+  var items = all.where((i) => i.type == k.type).toList();
+  if (ref.watch(parentalHideProvider)) {
+    items = items
+        .where((i) => !isAdult(i.name) && !isAdult(i.groupTitle))
+        .toList();
+  }
+  return items;
+});
+
 final searchResultsProvider = FutureProvider<List<MediaItem>>((ref) async {
   final q = ref.watch(searchQueryProvider);
   if (q.trim().isEmpty) return <MediaItem>[];

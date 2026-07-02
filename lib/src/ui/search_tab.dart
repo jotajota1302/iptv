@@ -9,7 +9,6 @@ import '../domain/media_item.dart';
 import '../domain/series_group.dart';
 import 'movie_detail_screen.dart';
 import 'play_helpers.dart';
-import 'series_detail_screen.dart';
 
 class SearchTab extends ConsumerWidget {
   const SearchTab({super.key});
@@ -26,30 +25,6 @@ class SearchTab extends ConsumerWidget {
         ContentType.series => Icons.theaters,
         _ => Icons.live_tv,
       };
-
-  /// Un resultado de serie abre el detalle (navegación por temporadas/capítulos);
-  /// el resto se reproduce directamente.
-  Future<void> _openResult(
-      BuildContext context, WidgetRef ref, MediaItem it) async {
-    if (it.type == ContentType.series) {
-      final group = it.groupTitle ?? 'Sin categoria';
-      final items =
-          await ref.read(playlistRepositoryProvider).seriesByCategory(group);
-      final groups = groupSeries(items);
-      for (final g in groups) {
-        final match = g.seasons.values
-            .any((eps) => eps.any((e) => e.item.id == it.id));
-        if (match) {
-          if (context.mounted) {
-            Navigator.of(context).push(MaterialPageRoute(
-                builder: (_) => SeriesDetailScreen(series: g)));
-          }
-          return;
-        }
-      }
-    }
-    if (context.mounted) openPlayer(context, it);
-  }
 
   Widget _section(String title, int count) => Padding(
         padding: const EdgeInsets.fromLTRB(16, 14, 16, 4),
@@ -75,7 +50,7 @@ class SearchTab extends ConsumerWidget {
       subtitle: Text('${g.sortedSeasons.length} temporada(s) · '
           '${g.episodeCount} episodio(s) encontrados'),
       trailing: const Icon(Icons.chevron_right, color: Colors.white38),
-      onTap: () => _openResult(context, ref, anyEpisode),
+      onTap: () => openSeriesDetail(context, ref, anyEpisode),
     );
   }
 
