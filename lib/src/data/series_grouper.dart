@@ -31,6 +31,22 @@ _Parsed _parseName(String name) {
 
 String _normalize(String s) => s.toLowerCase().trim();
 
+/// Limpia el nombre crudo de un episodio para mostrarlo dentro de su serie:
+/// quita el título de la serie, el patrón de numeración (SxxEyy / NxM) y los
+/// separadores colgantes. Puede devolver '' si el nombre no aporta más (el
+/// llamador decide el fallback, p. ej. "Episodio N").
+String cleanEpisodeName(String name, String seriesTitle) {
+  var out = name.trim();
+  if (seriesTitle.isNotEmpty) {
+    final t = RegExp.escape(seriesTitle.trim());
+    out = out.replaceFirst(RegExp(t, caseSensitive: false), '');
+  }
+  out = out.replaceFirst(_reSxxEyy, '');
+  out = out.replaceFirst(_reNxM, '');
+  out = out.replaceAll(RegExp(r'^[\s\-:_.]+|[\s\-:_.]+$'), '');
+  return out.trim();
+}
+
 /// Agrupa una lista de items (episodios) en series por título, y dentro de cada
 /// serie por temporada. Ordena series por título y episodios por número.
 List<SeriesGroup> groupSeries(List<MediaItem> items) {

@@ -8,6 +8,7 @@ import '../data/m3u_source.dart';
 import '../data/playlist_repository.dart';
 import '../data/account_service.dart';
 import '../data/series_grouper.dart';
+import '../data/series_info_service.dart';
 import '../data/vod_info_service.dart';
 import '../domain/adult_filter.dart';
 import '../domain/category.dart';
@@ -166,6 +167,22 @@ final seriesGroupsByCategoryProvider =
 
 /// Servicio de guía de programación (EPG) via API Xtream.
 final epgServiceProvider = Provider<EpgService>((_) => EpgService());
+
+/// Servicio de fichas de series (get_series / get_series_info).
+final seriesInfoServiceProvider =
+    Provider<SeriesInfoService>((_) => SeriesInfoService());
+
+/// Clave de ficha de serie: URL de un episodio (credenciales) + título.
+typedef SeriesInfoKey = ({String streamUrl, String title});
+
+/// Ficha de una serie: sinopsis, rating e imágenes/títulos de episodios.
+/// Best-effort: null si la API no responde o la serie no casa en el catálogo.
+final seriesInfoProvider =
+    FutureProvider.family<SeriesApiInfo?, SeriesInfoKey>((ref, k) {
+  return ref
+      .watch(seriesInfoServiceProvider)
+      .fetchForSeries(k.streamUrl, k.title);
+});
 
 /// Servicio de fichas de películas (metadatos) via API Xtream.
 final vodInfoServiceProvider = Provider<VodInfoService>((_) => VodInfoService());

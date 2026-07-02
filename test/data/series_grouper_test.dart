@@ -59,4 +59,22 @@ void main() {
     ]).single;
     expect(g.poster, 'http://poster.jpg');
   });
+
+  group('cleanEpisodeName', () {
+    test('quita el título de la serie y el patrón SxxEyy', () {
+      expect(cleanEpisodeName('Breaking Bad S01E01 - Pilot', 'Breaking Bad'),
+          'Pilot');
+      expect(cleanEpisodeName('Friends 1x02 The One', 'Friends'), 'The One');
+    });
+
+    test('vacío si el nombre no aporta nada más', () {
+      expect(cleanEpisodeName('Breaking Bad S01E02', 'Breaking Bad'), '');
+      expect(cleanEpisodeName('Dexter - S03E04', 'Dexter'), '');
+    });
+
+    test('conserva el nombre si no hay título de serie dentro', () {
+      expect(cleanEpisodeName('El comienzo del fin', 'Vikings'),
+          'El comienzo del fin');
+    });
+  });
 }
