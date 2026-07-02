@@ -2,12 +2,45 @@ import 'dart:convert';
 import 'package:dio/dio.dart';
 
 /// Una entrada de la guía de programación (EPG): un programa con su título y
-/// franja horaria.
+/// franja horaria. [hasArchive] indica si está disponible en el archivo
+/// (catch‑up) para rebobinarlo.
 class EpgEntry {
   final String title;
   final DateTime start;
   final DateTime end;
-  const EpgEntry({required this.title, required this.start, required this.end});
+  final bool hasArchive;
+  const EpgEntry({
+    required this.title,
+    required this.start,
+    required this.end,
+    this.hasArchive = false,
+  });
+
+  int get durationMinutes {
+    final m = end.difference(start).inMinutes;
+    return m > 0 ? m : 1;
+  }
+}
+
+/// Construye la URL de *timeshift* (catch‑up) de Xtream a partir de la URL del
+/// stream en directo del canal, la hora de inicio (local) y la duración.
+/// Formato: `{server}/timeshift/{user}/{pass}/{minutos}/{Y-m-d:H-i}/{id}.ts`.
+String? buildTimeshiftUrl(
+    String streamUrl, DateTime startLocal, int durationMinutes) {
+  final s = Uri.tryParse(streamUrl);
+  if (s == null) return null;
+  final segs = s.pathSegments;
+  if (segs.length < 3) return null;
+  final id = segs.last.split('.').first;
+  final pass = segs[segs.length - 2];
+  final user = segs[segs.length - 3];
+  if (id.isEmpty || user.isEmpty || pass.isEmpty) return null;
+  String two(int n) => n.toString().padLeft(2, '0');
+  final start = '${startLocal.year}-${two(startLocal.month)}-'
+      '${two(startLocal.day)}:${two(startLocal.hour)}-${two(startLocal.minute)}';
+  final port = s.hasPort ? ':${s.port}' : '';
+  return '${s.scheme}://${s.host}$port/timeshift/$user/$pass/'
+      '$durationMinutes/$start/$id.ts';
 }
 
 /// Construye una URL de la API Xtream para un [action] de EPG, derivando TODO
@@ -65,6 +98,7 @@ List<EpgEntry> parseShortEpg(Map<String, dynamic> json) {
       title: _decodeB64(e['title']),
       start: start,
       end: _tsToDate(e['stop_timestamp']) ?? start,
+      hasArchive: _asInt(e['has_archive']) == 1,
     ));
   }
   out.sort((a, b) => a.start.compareTo(b.start));
@@ -79,6 +113,8 @@ String _decodeB64(dynamic v) {
     return v;
   }
 }
+
+int? _asInt(dynamic v) => v is int ? v : int.tryParse('${v ?? ''}');
 
 DateTime? _tsToDate(dynamic v) {
   final n = v is int ? v : int.tryParse('$v');

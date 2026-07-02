@@ -55,5 +55,37 @@ void main() {
     test('lista vacia si no hay epg_listings', () {
       expect(parseShortEpg({}), isEmpty);
     });
+
+    test('detecta has_archive (catch-up)', () {
+      final entries = parseShortEpg({
+        'epg_listings': [
+          {
+            'title': base64.encode(utf8.encode('Con archivo')),
+            'start_timestamp': 1000,
+            'stop_timestamp': 4600,
+            'has_archive': 1,
+          },
+        ],
+      });
+      expect(entries.single.hasArchive, isTrue);
+      expect(entries.single.durationMinutes, 60);
+    });
+  });
+
+  group('buildTimeshiftUrl', () {
+    test('construye la URL de timeshift', () {
+      final url = buildTimeshiftUrl(
+        'https://host.tv:8443/live/u1/p1/157.ts',
+        DateTime(2026, 7, 2, 20, 5),
+        90,
+      );
+      expect(url,
+          'https://host.tv:8443/timeshift/u1/p1/90/2026-07-02:20-05/157.ts');
+    });
+
+    test('null si la URL no encaja', () {
+      expect(buildTimeshiftUrl('https://host.tv/solo.ts', DateTime(2026), 60),
+          isNull);
+    });
   });
 }

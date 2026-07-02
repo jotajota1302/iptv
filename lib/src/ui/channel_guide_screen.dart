@@ -1,7 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../app/providers.dart';
+import '../app/theme.dart';
+import '../data/epg_service.dart';
+import '../domain/content_type.dart';
 import '../domain/media_item.dart';
+import 'player_screen.dart';
 
 /// Guía de programación completa de un canal: lista de programas con su franja,
 /// agrupados por día, resaltando el que está en emisión ahora.
@@ -17,6 +21,21 @@ class ChannelGuideScreen extends ConsumerWidget {
       '${_dias[d.weekday - 1]} ${d.day}/${d.month}';
   String _hhmm(DateTime d) =>
       '${d.hour.toString().padLeft(2, '0')}:${d.minute.toString().padLeft(2, '0')}';
+
+  /// Reproduce un programa desde el archivo (catch‑up) vía timeshift.
+  void _playArchive(BuildContext context, EpgEntry e) {
+    final url = buildTimeshiftUrl(channel.streamUrl, e.start, e.durationMinutes);
+    if (url == null) return;
+    final item = MediaItem(
+      id: 'ts-${channel.id}-${e.start.millisecondsSinceEpoch}',
+      name: '${e.title} · ${channel.name}',
+      streamUrl: url,
+      type: ContentType.live,
+    );
+    Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => PlayerScreen(item: item)),
+    );
+  }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -45,6 +64,8 @@ class ChannelGuideScreen extends ConsumerWidget {
               ));
             }
             final onNow = now.isAfter(e.start) && now.isBefore(e.end);
+            // Catch‑up: programa ya emitido y disponible en el archivo.
+            final canCatchup = e.hasArchive && e.end.isBefore(now);
             rows.add(ListTile(
               dense: true,
               leading: Text('${_hhmm(e.start)}\n${_hhmm(e.end)}',
@@ -56,10 +77,19 @@ class ChannelGuideScreen extends ConsumerWidget {
                   style: TextStyle(
                       fontWeight:
                           onNow ? FontWeight.bold : FontWeight.normal)),
-              subtitle: onNow ? const Text('En emisión ahora') : null,
+              subtitle: onNow
+                  ? const Text('En emisión ahora')
+                  : (canCatchup
+                      ? const Text('Disponible en archivo',
+                          style: TextStyle(color: kAccent))
+                      : null),
+              trailing: canCatchup
+                  ? const Icon(Icons.replay, color: kAccent)
+                  : null,
               tileColor: onNow
                   ? Theme.of(context).colorScheme.primaryContainer
                   : null,
+              onTap: canCatchup ? () => _playArchive(context, e) : null,
             ));
           }
           return ListView(children: rows);
