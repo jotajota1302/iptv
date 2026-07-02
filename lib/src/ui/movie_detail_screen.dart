@@ -35,47 +35,98 @@ class MovieDetailScreen extends ConsumerWidget {
       body: CustomScrollView(
         slivers: [
           SliverAppBar(
-            expandedHeight: 320,
+            expandedHeight: 400,
             pinned: true,
             stretch: true,
             backgroundColor: kBackground,
             flexibleSpace: FlexibleSpaceBar(
-              background: _Backdrop(item: item, info: info),
+              // Backdrop de fondo con el póster grande centrado encima,
+              // estilo cartelera (el pequeño a la izquierda quedaba perdido).
+              background: Stack(
+                fit: StackFit.expand,
+                children: [
+                  _Backdrop(item: item, info: info),
+                  Align(
+                    alignment: const Alignment(0, 0.65),
+                    child: Hero(
+                      tag: 'movie-${item.id}',
+                      child: Container(
+                        width: 200,
+                        height: 300,
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(14),
+                          boxShadow: [
+                            BoxShadow(
+                                color: Colors.black.withValues(alpha: 0.75),
+                                blurRadius: 26,
+                                offset: const Offset(0, 14)),
+                          ],
+                        ),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(14),
+                          child: Container(
+                            color: kSurfaceHigh,
+                            child: item.logoUrl == null
+                                ? const Icon(Icons.movie_outlined, size: 48)
+                                : CachedNetworkImage(
+                                    imageUrl: item.logoUrl!,
+                                    fit: BoxFit.cover),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
               stretchModes: const [StretchMode.zoomBackground],
             ),
           ),
           SliverToBoxAdapter(
-            child: Transform.translate(
-              offset: const Offset(0, -48),
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _posterAndTitle(context, info),
-                    const SizedBox(height: 16),
-                    if (info != null) _chips(context, info),
-                    const SizedBox(height: 16),
-                    _actions(context, ref, resumeLabel, cat, info),
-                    const SizedBox(height: 20),
-                    if (infoAsync.isLoading) const _LoadingLine(),
-                    if (info != null && (info.plot ?? '').isNotEmpty) ...[
-                      const Text('Sinopsis',
-                          style: TextStyle(
-                              fontWeight: FontWeight.w700, fontSize: 16)),
-                      const SizedBox(height: 6),
-                      Text(info.plot!,
+            child: Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 860),
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Text(item.name,
+                          textAlign: TextAlign.center,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
                           style: const TextStyle(
-                              height: 1.5, color: Colors.white70)),
+                              fontSize: 24,
+                              fontWeight: FontWeight.w800,
+                              height: 1.2)),
+                      const SizedBox(height: 12),
+                      if (info != null) Center(child: _chips(context, info)),
                       const SizedBox(height: 16),
+                      Center(
+                        child: ConstrainedBox(
+                          constraints: const BoxConstraints(maxWidth: 560),
+                          child: _actions(context, ref, resumeLabel, cat, info),
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+                      if (infoAsync.isLoading) const _LoadingLine(),
+                      if (info != null && (info.plot ?? '').isNotEmpty) ...[
+                        const Text('Sinopsis',
+                            style: TextStyle(
+                                fontWeight: FontWeight.w700, fontSize: 16)),
+                        const SizedBox(height: 6),
+                        Text(info.plot!,
+                            style: const TextStyle(
+                                height: 1.5, color: Colors.white70)),
+                        const SizedBox(height: 16),
+                      ],
+                      if (info?.cast != null) _line('Reparto', info!.cast!),
+                      if (info?.director != null)
+                        _line('Dirección', info!.director!),
+                      if (info == null && !infoAsync.isLoading)
+                        const Text('Sin ficha disponible para este contenido',
+                            style: TextStyle(color: Colors.white38)),
                     ],
-                    if (info?.cast != null) _line('Reparto', info!.cast!),
-                    if (info?.director != null)
-                      _line('Dirección', info!.director!),
-                    if (info == null && !infoAsync.isLoading)
-                      const Text('Sin ficha disponible para este contenido',
-                          style: TextStyle(color: Colors.white38)),
-                  ],
+                  ),
                 ),
               ),
             ),
@@ -93,54 +144,19 @@ class MovieDetailScreen extends ConsumerWidget {
         .take(15)
         .toList();
     if (others.isEmpty) return const SizedBox(height: 8);
-    return Transform.translate(
-      offset: const Offset(0, -40),
-      child: ContentRail(
-        title: 'Más en $cat',
-        items: [
-          for (final m in others)
-            VodPoster(
-              title: m.name,
-              posterUrl: m.logoUrl,
-              titleOverlay: true,
-              favorite: m.isFavorite,
-              onTap: () => Navigator.of(context).pushReplacement(
-                MaterialPageRoute(builder: (_) => MovieDetailScreen(item: m)),
-              ),
-            ),
-        ],
-      ),
-    );
-  }
-
-  Widget _posterAndTitle(BuildContext context, VodInfo? info) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.end,
-      children: [
-        Hero(
-          tag: 'movie-${item.id}',
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(12),
-            child: Container(
-              width: 110,
-              height: 165,
-              color: kSurfaceHigh,
-              child: item.logoUrl == null
-                  ? const Icon(Icons.movie_outlined, size: 40)
-                  : CachedNetworkImage(
-                      imageUrl: item.logoUrl!, fit: BoxFit.cover),
+    return ContentRail(
+      title: 'Más en $cat',
+      items: [
+        for (final m in others)
+          VodPoster(
+            title: m.name,
+            posterUrl: m.logoUrl,
+            titleOverlay: true,
+            favorite: m.isFavorite,
+            onTap: () => Navigator.of(context).pushReplacement(
+              MaterialPageRoute(builder: (_) => MovieDetailScreen(item: m)),
             ),
           ),
-        ),
-        const SizedBox(width: 14),
-        Expanded(
-          child: Padding(
-            padding: const EdgeInsets.only(bottom: 6),
-            child: Text(item.name,
-                style: const TextStyle(
-                    fontSize: 22, fontWeight: FontWeight.w800, height: 1.2)),
-          ),
-        ),
       ],
     );
   }
@@ -155,6 +171,7 @@ class MovieDetailScreen extends ConsumerWidget {
     return Wrap(
       spacing: 8,
       runSpacing: 6,
+      alignment: WrapAlignment.center,
       children: [
         for (final t in chips)
           Chip(

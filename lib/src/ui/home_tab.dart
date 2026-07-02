@@ -526,6 +526,7 @@ class _FocusedInfo extends ConsumerWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
+              // Solo "Ver": la ficha ya se abre tocando la carátula central.
               if (f.isSeries)
                 FilledButton.icon(
                   onPressed: () => Navigator.of(context).push(
@@ -535,21 +536,12 @@ class _FocusedInfo extends ConsumerWidget {
                   icon: const Icon(Icons.theaters, size: 18),
                   label: const Text('Ver serie'),
                 )
-              else ...[
+              else
                 FilledButton.icon(
                   onPressed: () => openPlayer(context, f.item),
                   icon: const Icon(Icons.play_arrow, size: 20),
                   label: const Text('Ver'),
                 ),
-                const SizedBox(width: 8),
-                OutlinedButton.icon(
-                  onPressed: () => Navigator.of(context).push(
-                      MaterialPageRoute(
-                          builder: (_) => MovieDetailScreen(item: f.item))),
-                  icon: const Icon(Icons.info_outline, size: 18),
-                  label: const Text('Info'),
-                ),
-              ],
             ],
           ),
         ],
