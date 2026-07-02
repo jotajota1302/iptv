@@ -12,6 +12,7 @@ import '../data/series_info_service.dart';
 import '../data/vod_info_service.dart';
 import '../domain/adult_filter.dart';
 import '../domain/category.dart';
+import '../domain/channel_dedupe.dart';
 import '../domain/content_type.dart';
 import '../domain/media_item.dart';
 import '../domain/series_group.dart';
@@ -157,9 +158,22 @@ void setDeinterlaceSetting(WidgetRef ref, bool value) {
   ref.read(sharedPrefsProvider).setBool(_kDeinterlace, value);
 }
 
+/// Ocultar canales duplicados (mismo nombre) dentro de una categoría.
+/// Muchas listas repiten el mismo canal varias veces (feeds de respaldo).
+/// Persistido; por defecto activado.
+final hideDuplicatesProvider = StateProvider<bool>((ref) =>
+    ref.watch(sharedPrefsProvider).getBool('hide_duplicates') ?? true);
+
+void setHideDuplicates(WidgetRef ref, bool value) {
+  ref.read(hideDuplicatesProvider.notifier).state = value;
+  ref.read(sharedPrefsProvider).setBool('hide_duplicates', value);
+}
+
 final liveByCategoryProvider =
-    FutureProvider.family<List<MediaItem>, String>((ref, group) {
-  return ref.watch(playlistRepositoryProvider).liveByCategory(group);
+    FutureProvider.family<List<MediaItem>, String>((ref, group) async {
+  final items =
+      await ref.watch(playlistRepositoryProvider).liveByCategory(group);
+  return ref.watch(hideDuplicatesProvider) ? dedupeChannels(items) : items;
 });
 
 /// Primeros logos de cada categoría de TV (collage de las tarjetas).

@@ -460,6 +460,16 @@ class _SettingsTabState extends ConsumerState<SettingsTab> {
           value: deinterlace,
           onChanged: (v) => setDeinterlaceSetting(ref, v),
         ),
+        SwitchListTile(
+          contentPadding: EdgeInsets.zero,
+          title: const Text('Ocultar canales duplicados'),
+          subtitle: const Text(
+              'Muchas listas repiten el mismo canal varias veces (feeds de '
+              'respaldo). Muestra solo uno por nombre; desactívalo si un '
+              'canal no funciona y quieres probar sus copias.'),
+          value: ref.watch(hideDuplicatesProvider),
+          onChanged: (v) => setHideDuplicates(ref, v),
+        ),
 
         const SizedBox(height: 24),
         const Divider(),
