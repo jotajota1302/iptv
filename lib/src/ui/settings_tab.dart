@@ -64,6 +64,38 @@ class _SettingsTabState extends ConsumerState<SettingsTab> {
     await _run(() => ref.read(playlistRepositoryProvider).loadFromUrl(pl.url));
   }
 
+  /// Registra como "Mi lista" la lista que ya está cargada en la BD pero que no
+  /// se guardó (cargada antes de existir la gestión de listas).
+  void _recover(String url) {
+    final id = DateTime.now().microsecondsSinceEpoch.toString();
+    ref
+        .read(playlistsProvider.notifier)
+        .add(SavedPlaylist(id: id, name: 'Mi lista', url: url));
+  }
+
+  /// Tarjeta que ofrece recuperar la lista ya cargada (si la hay).
+  Widget _recoverCard() {
+    final loaded = ref.watch(loadedListUrlProvider).value;
+    if (loaded == null) {
+      return const Padding(
+        padding: EdgeInsets.symmetric(vertical: 8),
+        child: Text('Aún no has guardado ninguna lista. Añade una abajo.',
+            style: TextStyle(color: Colors.white54)),
+      );
+    }
+    return Card(
+      child: ListTile(
+        leading: const Icon(Icons.download_done),
+        title: const Text('Recuperar lista cargada'),
+        subtitle: Text(loaded, maxLines: 1, overflow: TextOverflow.ellipsis),
+        trailing: FilledButton(
+          onPressed: () => _recover(loaded),
+          child: const Text('Guardar'),
+        ),
+      ),
+    );
+  }
+
   /// Cambia el control parental. Al desactivarlo, si hay PIN, lo pide.
   Future<void> _toggleParental(bool value) async {
     final pin = ref.read(parentalPinProvider);
@@ -144,35 +176,44 @@ class _SettingsTabState extends ConsumerState<SettingsTab> {
       padding: const EdgeInsets.all(16),
       children: [
         // --- Mis listas ---
-        if (playlists.playlists.isNotEmpty) ...[
-          const Text('Mis listas', style: TextStyle(fontSize: 20)),
-          const SizedBox(height: 4),
-          for (final pl in playlists.playlists)
-            Card(
-              child: ListTile(
-                leading: Icon(
-                  pl.id == playlists.activeId
-                      ? Icons.radio_button_checked
-                      : Icons.radio_button_unchecked,
-                  color: pl.id == playlists.activeId
-                      ? Theme.of(context).colorScheme.primary
-                      : null,
+        const Text('Mis listas', style: TextStyle(fontSize: 20)),
+        const SizedBox(height: 4),
+        if (playlists.playlists.isEmpty) _recoverCard(),
+        for (final pl in playlists.playlists)
+          Card(
+            child: Column(
+              children: [
+                ListTile(
+                  leading: Icon(
+                    pl.id == playlists.activeId
+                        ? Icons.radio_button_checked
+                        : Icons.radio_button_unchecked,
+                    color: pl.id == playlists.activeId
+                        ? Theme.of(context).colorScheme.primary
+                        : null,
+                  ),
+                  title: Text(pl.name),
+                  subtitle: Text(pl.url,
+                      maxLines: 1, overflow: TextOverflow.ellipsis),
+                  trailing: IconButton(
+                    icon: const Icon(Icons.delete_outline),
+                    tooltip: 'Eliminar lista',
+                    onPressed: _loading
+                        ? null
+                        : () =>
+                            ref.read(playlistsProvider.notifier).remove(pl.id),
+                  ),
+                  onTap: _loading ? null : () => _activate(pl),
                 ),
-                title: Text(pl.name),
-                subtitle: Text(pl.url, maxLines: 1, overflow: TextOverflow.ellipsis),
-                trailing: IconButton(
-                  icon: const Icon(Icons.delete_outline),
-                  tooltip: 'Eliminar lista',
-                  onPressed: _loading
-                      ? null
-                      : () => ref.read(playlistsProvider.notifier).remove(pl.id),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
+                  child: _AccountStatus(pl.url),
                 ),
-                onTap: _loading ? null : () => _activate(pl),
-              ),
+              ],
             ),
-          const SizedBox(height: 20),
-          const Divider(),
-        ],
+          ),
+        const SizedBox(height: 20),
+        const Divider(),
 
         // --- Añadir lista ---
         const Text('Añadir lista M3U', style: TextStyle(fontSize: 20)),
@@ -308,6 +349,58 @@ class _SettingsTabState extends ConsumerState<SettingsTab> {
           subtitle: SelectableText('github.com/jotajota1302/iptv'),
         ),
       ],
+    );
+  }
+}
+
+/// Muestra el estado de la cuenta Xtream de una lista (activa, caducidad,
+/// conexiones). Best-effort: no muestra nada si el proveedor no responde.
+class _AccountStatus extends ConsumerWidget {
+  final String url;
+  const _AccountStatus(this.url);
+
+  String _fmtDate(DateTime d) =>
+      '${d.day.toString().padLeft(2, '0')}/'
+      '${d.month.toString().padLeft(2, '0')}/${d.year}';
+
+  Widget _chip(String text, Color color) => Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.16),
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Text(text, style: TextStyle(fontSize: 11, color: color)),
+      );
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final async = ref.watch(accountInfoProvider(url));
+    if (async.isLoading) {
+      return const Align(
+        alignment: Alignment.centerLeft,
+        child: Text('Comprobando estado…',
+            style: TextStyle(fontSize: 11, color: Colors.white38)),
+      );
+    }
+    final info = async.value;
+    if (info == null) return const SizedBox.shrink();
+    const green = Color(0xFF43D17A);
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: Wrap(
+        spacing: 6,
+        runSpacing: 4,
+        children: [
+          _chip(info.isActive ? '● Activa' : '● ${info.status}',
+              info.isActive ? green : Colors.redAccent),
+          if (info.expiry != null)
+            _chip('Caduca ${_fmtDate(info.expiry!)}', Colors.white70),
+          if (info.maxConnections > 0)
+            _chip('${info.activeConnections}/${info.maxConnections} conexiones',
+                Colors.white70),
+          if (info.isTrial) _chip('Prueba', Colors.orangeAccent),
+        ],
+      ),
     );
   }
 }

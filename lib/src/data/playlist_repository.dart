@@ -109,6 +109,9 @@ class PlaylistRepository {
   /// Posición de reproducción guardada (segundos) de un item.
   Future<int> progress(String id) => _db.getPosition(id);
 
+  /// URL de un stream cargado (para reconstruir la lista si se cargó sin guardar).
+  Future<String?> sampleStreamUrl() => _db.sampleStreamUrl();
+
   /// Películas/series empezadas y sin terminar (más recientes primero).
   Future<List<MediaItem>> continueWatching() => _db.itemsInProgress();
 

@@ -261,6 +261,12 @@ class AppDatabase extends _$AppDatabase {
     return rows.map(_map).toList();
   }
 
+  /// URL de un stream cualquiera (para reconstruir la URL de la lista cargada).
+  Future<String?> sampleStreamUrl() async {
+    final row = await (select(items)..limit(1)).getSingleOrNull();
+    return row?.streamUrl;
+  }
+
   Future<List<MediaItem>> favorites() async {
     final rows = await (select(items)
           ..where((t) => t.isFavorite.equals(true) & _visible(t)))

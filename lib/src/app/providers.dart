@@ -6,6 +6,7 @@ import '../data/app_database.dart';
 import '../data/epg_service.dart';
 import '../data/m3u_source.dart';
 import '../data/playlist_repository.dart';
+import '../data/account_service.dart';
 import '../data/series_grouper.dart';
 import '../data/vod_info_service.dart';
 import '../domain/adult_filter.dart';
@@ -83,6 +84,23 @@ final loadStateProvider = StateProvider<String?>((_) => null);
 final playlistsProvider =
     StateNotifierProvider<PlaylistsNotifier, PlaylistsState>((ref) {
   return PlaylistsNotifier(ref.watch(sharedPrefsProvider));
+});
+
+/// Estado de cuenta Xtream (activa, caducidad, conexiones) de una lista.
+final accountServiceProvider = Provider<AccountService>((_) => AccountService());
+
+final accountInfoProvider =
+    FutureProvider.family<AccountInfo?, String>((ref, listUrl) {
+  return ref.watch(accountServiceProvider).fetch(listUrl);
+});
+
+/// URL de la lista actualmente cargada, reconstruida desde la BD (para
+/// recuperar listas cargadas antes de la gestión de listas).
+final loadedListUrlProvider = FutureProvider<String?>((ref) async {
+  final sample =
+      await ref.watch(playlistRepositoryProvider).sampleStreamUrl();
+  if (sample == null) return null;
+  return deriveListUrlFromStream(sample);
 });
 
 /// Instancia de SharedPreferences. Se inyecta en `main()` con override.
