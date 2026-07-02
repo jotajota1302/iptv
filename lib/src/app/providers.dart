@@ -89,6 +89,10 @@ final searchByTypeProvider =
         .where((i) => !isAdult(i.name) && !isAdult(i.groupTitle))
         .toList();
   }
+  // En TV se aplica el mismo filtro de duplicados que en las categorías.
+  if (k.type == ContentType.live && ref.watch(hideDuplicatesProvider)) {
+    items = dedupeChannels(items);
+  }
   return items;
 });
 

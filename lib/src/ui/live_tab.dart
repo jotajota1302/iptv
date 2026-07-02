@@ -4,27 +4,43 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../app/providers.dart';
 import '../domain/category.dart';
 import '../domain/content_type.dart';
+import '../domain/media_item.dart';
 import 'channel_list_screen.dart';
+import 'player_screen.dart';
 import 'widgets/category_tile.dart';
 
-class LiveTab extends ConsumerWidget {
+class LiveTab extends ConsumerStatefulWidget {
   const LiveTab({super.key});
+  @override
+  ConsumerState<LiveTab> createState() => _LiveTabState();
+}
 
-  void _open(BuildContext context, Category cat) {
+class _LiveTabState extends ConsumerState<LiveTab> {
+  final _searchCtrl = TextEditingController();
+  String _query = '';
+
+  @override
+  void dispose() {
+    _searchCtrl.dispose();
+    super.dispose();
+  }
+
+  void _open(Category cat) {
     Navigator.of(context).push(
       MaterialPageRoute(builder: (_) => ChannelListScreen(category: cat)),
     );
   }
 
-  Future<void> _hide(WidgetRef ref, Category cat) async {
+  Future<void> _hide(Category cat) async {
     await ref.read(playlistRepositoryProvider).hideCategory(cat.name);
     ref.invalidate(liveCategoriesProvider);
   }
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final async = ref.watch(liveCategoriesProvider);
     final grid = ref.watch(categoryGridProvider);
+    final searching = _query.trim().isNotEmpty;
     return Column(
       children: [
         Padding(
@@ -43,29 +59,106 @@ class LiveTab extends ConsumerWidget {
             ],
           ),
         ),
-        Expanded(
-          child: async.when(
-            loading: () => const CategoryListSkeleton(),
-            error: (e, _) => Center(child: Text('Error: $e')),
-            data: (cats) {
-              if (cats.isEmpty) {
-                return const Center(
-                    child: Text('Añade una lista en Ajustes para empezar'));
-              }
-              return grid
-                  ? _buildGrid(context, ref, cats)
-                  : _buildList(context, ref, cats);
-            },
+        // Buscador global de canales (sin pasar por categorías).
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+          child: TextField(
+            controller: _searchCtrl,
+            decoration: InputDecoration(
+              hintText: 'Buscar canal...',
+              prefixIcon: const Icon(Icons.search),
+              isDense: true,
+              border:
+                  OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+              suffixIcon: searching
+                  ? IconButton(
+                      icon: const Icon(Icons.clear),
+                      onPressed: () {
+                        _searchCtrl.clear();
+                        setState(() => _query = '');
+                      },
+                    )
+                  : null,
+            ),
+            onChanged: (v) => setState(() => _query = v),
           ),
+        ),
+        Expanded(
+          child: searching
+              ? _results()
+              : async.when(
+                  loading: () => const CategoryListSkeleton(),
+                  error: (e, _) => Center(child: Text('Error: $e')),
+                  data: (cats) {
+                    if (cats.isEmpty) {
+                      return const Center(
+                          child:
+                              Text('Añade una lista en Ajustes para empezar'));
+                    }
+                    return grid ? _buildGrid(cats) : _buildList(cats);
+                  },
+                ),
         ),
       ],
     );
   }
 
-  PopupMenuButton<String> _menu(WidgetRef ref, Category cat) =>
-      PopupMenuButton<String>(
+  /// Resultados de búsqueda: la lista sirve además de cola de zapping.
+  Widget _results() {
+    final async = ref
+        .watch(searchByTypeProvider((type: ContentType.live, query: _query)));
+    return async.when(
+      loading: () => const Center(child: CircularProgressIndicator()),
+      error: (e, _) => Center(child: Text('Error: $e')),
+      data: (items) {
+        if (items.isEmpty) {
+          return const Center(
+              child: Text('Sin resultados',
+                  style: TextStyle(color: Colors.white54)));
+        }
+        return ListView.builder(
+          itemCount: items.length,
+          itemBuilder: (_, i) {
+            final it = items[i];
+            return ListTile(
+              leading: _logo(it),
+              title: Text(it.name),
+              subtitle:
+                  it.groupTitle != null ? Text(it.groupTitle!) : null,
+              onTap: () => Navigator.of(context).push(MaterialPageRoute(
+                builder: (_) =>
+                    PlayerScreen(item: it, queue: items, queueIndex: i),
+              )),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _logo(MediaItem it) {
+    const fallback = Icon(Icons.live_tv, size: 22, color: Colors.black38);
+    return Container(
+      width: 46,
+      height: 46,
+      padding: const EdgeInsets.all(6),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF7F8FA),
+        borderRadius: BorderRadius.circular(9),
+      ),
+      child: it.logoUrl == null
+          ? fallback
+          : CachedNetworkImage(
+              imageUrl: it.logoUrl!,
+              fit: BoxFit.contain,
+              errorWidget: (_, _, _) => fallback,
+            ),
+    );
+  }
+
+  PopupMenuButton<String> _menu(Category cat) => PopupMenuButton<String>(
         onSelected: (a) {
-          if (a == 'ocultar') _hide(ref, cat);
+          if (a == 'ocultar') _hide(cat);
         },
         itemBuilder: (_) => const [
           PopupMenuItem(
@@ -76,7 +169,7 @@ class LiveTab extends ConsumerWidget {
         ],
       );
 
-  Widget _buildList(BuildContext context, WidgetRef ref, List<Category> cats) {
+  Widget _buildList(List<Category> cats) {
     return ListView.builder(
       itemCount: cats.length,
       itemBuilder: (_, i) {
@@ -85,8 +178,8 @@ class LiveTab extends ConsumerWidget {
           icon: Icons.live_tv_outlined,
           name: cat.name,
           count: cat.itemCount,
-          onTap: () => _open(context, cat),
-          onHide: () => _hide(ref, cat),
+          onTap: () => _open(cat),
+          onHide: () => _hide(cat),
         );
       },
     );
@@ -94,7 +187,7 @@ class LiveTab extends ConsumerWidget {
 
   /// Mini-collage con los primeros logos de la categoría; si no hay logos,
   /// vuelve al icono genérico de TV.
-  Widget _collage(WidgetRef ref, Category cat) {
+  Widget _collage(Category cat) {
     final logos = ref
             .watch(categoryLogosProvider(ContentType.live))
             .value?[cat.name] ??
@@ -123,7 +216,7 @@ class LiveTab extends ConsumerWidget {
     );
   }
 
-  Widget _buildGrid(BuildContext context, WidgetRef ref, List<Category> cats) {
+  Widget _buildGrid(List<Category> cats) {
     return GridView.builder(
       padding: const EdgeInsets.all(8),
       gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
@@ -138,7 +231,7 @@ class LiveTab extends ConsumerWidget {
         return Card(
           clipBehavior: Clip.antiAlias,
           child: InkWell(
-            onTap: () => _open(context, cat),
+            onTap: () => _open(cat),
             child: Padding(
               padding: const EdgeInsets.all(12),
               child: Column(
@@ -146,8 +239,8 @@ class LiveTab extends ConsumerWidget {
                 children: [
                   Row(
                     children: [
-                      Expanded(child: _collage(ref, cat)),
-                      _menu(ref, cat),
+                      Expanded(child: _collage(cat)),
+                      _menu(cat),
                     ],
                   ),
                   const Spacer(),
