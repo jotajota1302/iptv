@@ -188,6 +188,12 @@ class _HeroState extends State<_Hero> {
     super.dispose();
   }
 
+  void _go(int delta) {
+    final target = (_page + delta).clamp(0, widget.movies.length - 1);
+    _pc.animateToPage(target,
+        duration: const Duration(milliseconds: 350), curve: Curves.easeOut);
+  }
+
   @override
   Widget build(BuildContext context) {
     final movies = widget.movies;
@@ -196,14 +202,31 @@ class _HeroState extends State<_Hero> {
         const SizedBox(height: 12),
         SizedBox(
           height: 260,
-          child: PageView.builder(
-            controller: _pc,
-            itemCount: movies.length,
-            onPageChanged: (i) => setState(() => _page = i),
-            itemBuilder: (_, i) => Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 6),
-              child: _HeroCard(movie: movies[i]),
-            ),
+          child: Stack(
+            alignment: Alignment.center,
+            children: [
+              PageView.builder(
+                controller: _pc,
+                itemCount: movies.length,
+                onPageChanged: (i) => setState(() => _page = i),
+                itemBuilder: (_, i) => Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 6),
+                  child: _HeroCard(movie: movies[i]),
+                ),
+              ),
+              if (_page > 0)
+                Positioned(
+                  left: 8,
+                  child: _HeroArrow(
+                      icon: Icons.chevron_left, onTap: () => _go(-1)),
+                ),
+              if (_page < movies.length - 1)
+                Positioned(
+                  right: 8,
+                  child: _HeroArrow(
+                      icon: Icons.chevron_right, onTap: () => _go(1)),
+                ),
+            ],
           ),
         ),
         const SizedBox(height: 8),
@@ -224,6 +247,27 @@ class _HeroState extends State<_Hero> {
           ],
         ),
       ],
+    );
+  }
+}
+
+class _HeroArrow extends StatelessWidget {
+  final IconData icon;
+  final VoidCallback onTap;
+  const _HeroArrow({required this.icon, required this.onTap});
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.black54,
+      shape: const CircleBorder(),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.all(6),
+          child: Icon(icon, color: Colors.white, size: 26),
+        ),
+      ),
     );
   }
 }
