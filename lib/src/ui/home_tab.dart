@@ -1,5 +1,6 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../app/providers.dart';
 import '../app/theme.dart';
@@ -232,9 +233,14 @@ class _HeroState extends State<_Hero> {
   PageController? _pc;
   double _fraction = 0;
 
-  /// Arranca enfocado en el centro de la lista: se puede navegar hacia los
-  /// dos lados desde el primer momento.
-  late int _page = widget.items.length ~/ 2;
+  /// Carrusel infinito: el PageView tiene muchas páginas y cada una mapea a
+  /// items[i % n], así al pasar el último se vuelve al primero sin corte.
+  /// Arranca lejos del borde para poder navegar a ambos lados.
+  late int _page = widget.items.length * 500 + widget.items.length ~/ 2;
+
+  int get _n => widget.items.length;
+
+  _Featured get _current => widget.items[_page % _n];
 
   void _openDetail(_Featured f) {
     Navigator.of(context).push(MaterialPageRoute(
@@ -263,19 +269,37 @@ class _HeroState extends State<_Hero> {
   }
 
   void _go(int delta) {
-    final target = (_page + delta).clamp(0, widget.items.length - 1);
-    _pc?.animateToPage(target,
+    _pc?.animateToPage(_page + delta,
         duration: const Duration(milliseconds: 350), curve: Curves.easeOut);
+  }
+
+  /// Flechas ←/→ del teclado mueven el carrusel (escritorio/TV).
+  KeyEventResult _onKey(FocusNode node, KeyEvent e) {
+    if (e is! KeyDownEvent && e is! KeyRepeatEvent) {
+      return KeyEventResult.ignored;
+    }
+    if (e.logicalKey == LogicalKeyboardKey.arrowLeft) {
+      _go(-1);
+      return KeyEventResult.handled;
+    }
+    if (e.logicalKey == LogicalKeyboardKey.arrowRight) {
+      _go(1);
+      return KeyEventResult.handled;
+    }
+    return KeyEventResult.ignored;
   }
 
   @override
   Widget build(BuildContext context) {
     final items = widget.items;
-    return Column(
+    return Focus(
+      autofocus: true,
+      onKeyEvent: _onKey,
+      child: Column(
       children: [
         const SizedBox(height: 12),
         SizedBox(
-          height: 272,
+          height: 254,
           child: LayoutBuilder(
             builder: (context, constraints) {
               _ensureController(constraints.maxWidth);
@@ -285,11 +309,13 @@ class _HeroState extends State<_Hero> {
                 children: [
                   PageView.builder(
                     controller: pc,
-                    itemCount: items.length,
+                    // "Infinito": muchas páginas mapeadas con módulo.
+                    itemCount: items.length * 1000,
                     onPageChanged: (i) => setState(() => _page = i),
                     itemBuilder: (_, i) => AnimatedBuilder(
                       animation: pc,
                       builder: (_, _) {
+                        final f = items[i % items.length];
                         final page = pc.position.haveDimensions
                             ? (pc.page ?? _page.toDouble())
                             : _page.toDouble();
@@ -314,15 +340,15 @@ class _HeroState extends State<_Hero> {
                               transform: m,
                               alignment: Alignment.center,
                               child: _JukeboxCard(
-                                poster: items[i].poster,
-                                fallbackIcon: items[i].isSeries
+                                poster: f.poster,
+                                fallbackIcon: f.isSeries
                                     ? Icons.theaters
                                     : Icons.movie_outlined,
                                 focus: focus,
                                 dim: dim,
                                 onTap: () {
                                   if (i == _page) {
-                                    _openDetail(items[i]);
+                                    _openDetail(f);
                                   } else {
                                     pc.animateToPage(i,
                                         duration:
@@ -337,18 +363,16 @@ class _HeroState extends State<_Hero> {
                       },
                     ),
                   ),
-                  if (_page > 0)
-                    Positioned(
-                      left: 8,
-                      child: _HeroArrow(
-                          icon: Icons.chevron_left, onTap: () => _go(-1)),
-                    ),
-                  if (_page < items.length - 1)
-                    Positioned(
-                      right: 8,
-                      child: _HeroArrow(
-                          icon: Icons.chevron_right, onTap: () => _go(1)),
-                    ),
+                  Positioned(
+                    left: 8,
+                    child: _HeroArrow(
+                        icon: Icons.chevron_left, onTap: () => _go(-1)),
+                  ),
+                  Positioned(
+                    right: 8,
+                    child: _HeroArrow(
+                        icon: Icons.chevron_right, onTap: () => _go(1)),
+                  ),
                 ],
               );
             },
@@ -359,16 +383,18 @@ class _HeroState extends State<_Hero> {
         AnimatedSwitcher(
           duration: const Duration(milliseconds: 250),
           child: _FocusedInfo(
-              key: ValueKey(items[_page].item.id), featured: items[_page]),
+              key: ValueKey('${_page % _n}-${_current.item.id}'),
+              featured: _current),
         ),
       ],
+      ),
     );
   }
 }
 
-/// Carátula 2:3 del jukebox con reflejo tipo máquina de discos. El halo y el
-/// borde de acento se funden de forma continua con [focus] (0..1) y las
-/// laterales se oscurecen con [dim].
+/// Carátula 2:3 del jukebox, estilo cartel de cine: sombra profunda
+/// proyectada hacia abajo (volumen), halo/borde de acento que se funde de
+/// forma continua con [focus] (0..1) y atenuado de las laterales con [dim].
 class _JukeboxCard extends StatelessWidget {
   final String? poster;
   final IconData fallbackIcon;
@@ -383,85 +409,55 @@ class _JukeboxCard extends StatelessWidget {
     required this.onTap,
   });
 
-  Widget _image() => poster == null
-      ? Container(color: kSurfaceHigh, child: Icon(fallbackIcon, size: 40))
-      : CachedNetworkImage(
-          imageUrl: poster!,
-          fit: BoxFit.cover,
-          errorWidget: (_, _, _) => Container(
-              color: kSurfaceHigh, child: Icon(fallbackIcon, size: 40)),
-        );
-
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: onTap,
       child: AspectRatio(
-        // 2:3 de la carátula + banda inferior para el reflejo.
-        aspectRatio: 2 / 3.5,
-        child: Column(
-          children: [
-            Expanded(
-              flex: 100,
-              child: Container(
-                margin: const EdgeInsets.symmetric(horizontal: 5),
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(12),
-                  border: focus > 0.05
-                      ? Border.all(
-                          color: kAccent.withValues(alpha: focus),
-                          width: 2.5 * focus)
-                      : null,
-                  boxShadow: [
-                    if (focus > 0.05)
-                      BoxShadow(
-                          color: kAccent.withValues(alpha: 0.38 * focus),
-                          blurRadius: 20,
-                          spreadRadius: 1),
-                    const BoxShadow(color: Colors.black54, blurRadius: 8),
-                  ],
-                ),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(9.5),
-                  child: Stack(
-                    fit: StackFit.expand,
-                    children: [
-                      _image(),
-                      if (dim > 0.01) Container(color: Colors.black.withValues(alpha: dim)),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(height: 3),
-            // Reflejo: la carátula invertida desvaneciéndose, como en las
-            // máquinas de discos.
-            Expanded(
-              flex: 16,
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 5),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(6),
-                  child: ShaderMask(
-                    shaderCallback: (r) => const LinearGradient(
-                      begin: Alignment.topCenter,
-                      end: Alignment.bottomCenter,
-                      colors: [Colors.white30, Colors.transparent],
-                    ).createShader(r),
-                    blendMode: BlendMode.dstIn,
-                    child: Transform.flip(
-                      flipY: true,
-                      child: OverflowBox(
-                        alignment: Alignment.topCenter,
-                        maxHeight: double.infinity,
-                        child: AspectRatio(aspectRatio: 2 / 3, child: _image()),
+        aspectRatio: 2 / 3,
+        child: Container(
+          margin: const EdgeInsets.symmetric(horizontal: 5),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(12),
+            border: focus > 0.05
+                ? Border.all(
+                    color: kAccent.withValues(alpha: focus),
+                    width: 2.5 * focus)
+                : null,
+            boxShadow: [
+              if (focus > 0.05)
+                BoxShadow(
+                    color: kAccent.withValues(alpha: 0.35 * focus),
+                    blurRadius: 22,
+                    spreadRadius: 1),
+              // Sombra de cartel: caída hacia abajo con cuerpo.
+              BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.65),
+                  blurRadius: 18,
+                  offset: const Offset(0, 12)),
+            ],
+          ),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(9.5),
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                poster == null
+                    ? Container(
+                        color: kSurfaceHigh,
+                        child: Icon(fallbackIcon, size: 40))
+                    : CachedNetworkImage(
+                        imageUrl: poster!,
+                        fit: BoxFit.cover,
+                        errorWidget: (_, _, _) => Container(
+                            color: kSurfaceHigh,
+                            child: Icon(fallbackIcon, size: 40)),
                       ),
-                    ),
-                  ),
-                ),
-              ),
+                if (dim > 0.01)
+                  Container(color: Colors.black.withValues(alpha: dim)),
+              ],
             ),
-          ],
+          ),
         ),
       ),
     );
