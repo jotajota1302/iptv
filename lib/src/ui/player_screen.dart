@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io' show exit;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -21,12 +22,17 @@ class PlayerScreen extends ConsumerStatefulWidget {
   final List<MediaItem>? queue;
   final int queueIndex;
 
+  /// True cuando esta pantalla ES una ventana de visor independiente (proceso
+  /// lanzado con `--play`): el botón de salir cierra el proceso entero.
+  final bool viewerWindow;
+
   const PlayerScreen({
     super.key,
     required this.item,
     this.resume = false,
     this.queue,
     this.queueIndex = 0,
+    this.viewerWindow = false,
   });
   @override
   ConsumerState<PlayerScreen> createState() => _PlayerScreenState();
@@ -318,6 +324,13 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
+          leading: widget.viewerWindow
+              ? IconButton(
+                  icon: const Icon(Icons.close),
+                  tooltip: 'Cerrar ventana',
+                  onPressed: () => exit(0),
+                )
+              : null,
           title: Text(widget.item.name),
           actions: [..._trackActions(), _helpButton(context)]),
       backgroundColor: Colors.black,

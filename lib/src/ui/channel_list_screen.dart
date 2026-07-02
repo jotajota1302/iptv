@@ -2,6 +2,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:media_kit_video/media_kit_video.dart';
+import '../app/external_viewer.dart';
 import '../app/providers.dart';
 import '../domain/category.dart';
 import '../domain/media_item.dart';
@@ -77,13 +78,18 @@ class _ChannelListScreenState extends ConsumerState<ChannelListScreen> {
   }
 
   PopupMenuButton<String> _menu(MediaItem it) => PopupMenuButton<String>(
-        onSelected: (a) => _action(a, it),
+        onSelected: (a) => a == 'ventana'
+            ? openExternalViewer(it)
+            : _action(a, it),
         itemBuilder: (_) => [
           PopupMenuItem(
               value: 'favorito',
               child: Text(it.isFavorite
                   ? 'Quitar de favoritos'
                   : 'Añadir a favoritos')),
+          if (canOpenExternalViewer)
+            const PopupMenuItem(
+                value: 'ventana', child: Text('Abrir en ventana nueva')),
           const PopupMenuItem(value: 'ocultar', child: Text('Ocultar')),
           const PopupMenuItem(value: 'borrar', child: Text('Borrar')),
         ],
@@ -193,7 +199,18 @@ class _ChannelListScreenState extends ConsumerState<ChannelListScreen> {
                 icon: const Icon(Icons.fullscreen),
                 label: const Text('Pantalla completa'),
               ),
-              const SizedBox(width: 8),
+              const SizedBox(width: 4),
+              if (canOpenExternalViewer)
+                IconButton(
+                  icon: const Icon(Icons.open_in_new),
+                  tooltip: 'Abrir en ventana nueva',
+                  onPressed: () async {
+                    // El visor externo asume la reproducción: paramos el
+                    // preview para no oír el canal por duplicado.
+                    await openExternalViewer(sel);
+                    await _previewCtrl?.pause();
+                  },
+                ),
               IconButton(
                 icon: Icon(
                     sel.isFavorite ? Icons.favorite : Icons.favorite_border),
