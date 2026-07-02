@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:media_kit_video/media_kit_video.dart';
 import '../app/external_viewer.dart';
 import '../app/providers.dart';
+import '../app/theme.dart';
 import '../domain/category.dart';
 import '../domain/media_item.dart';
 import '../domain/sort_mode.dart';
@@ -27,9 +28,21 @@ class _ChannelListScreenState extends ConsumerState<ChannelListScreen> {
   MediaKitPlayerController? _previewCtrl;
   VideoController? _previewVideo;
   MediaItem? _selected;
+  final _scroll = ScrollController();
+  bool _showToTop = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _scroll.addListener(() {
+      final show = _scroll.offset > 600;
+      if (show != _showToTop) setState(() => _showToTop = show);
+    });
+  }
 
   @override
   void dispose() {
+    _scroll.dispose();
     _previewCtrl?.dispose();
     super.dispose();
   }
@@ -128,6 +141,18 @@ class _ChannelListScreenState extends ConsumerState<ChannelListScreen> {
         title: Text(widget.category.name),
         actions: [
           const SortMenu(),
+          if (grid)
+            PopupMenuButton<int>(
+              icon: const Icon(Icons.photo_size_select_large),
+              tooltip: 'Tamaño de los canales',
+              initialValue: ref.watch(channelTileSizeProvider),
+              onSelected: (v) => setChannelTileSize(ref, v),
+              itemBuilder: (_) => const [
+                CheckedPopupMenuItem(value: 0, child: Text('Compacto')),
+                CheckedPopupMenuItem(value: 1, child: Text('Medio')),
+                CheckedPopupMenuItem(value: 2, child: Text('Grande')),
+              ],
+            ),
           IconButton(
             icon: Icon(grid ? Icons.view_list : Icons.grid_view),
             tooltip: grid ? 'Ver como lista' : 'Ver como cuadrícula',
@@ -135,6 +160,15 @@ class _ChannelListScreenState extends ConsumerState<ChannelListScreen> {
           ),
         ],
       ),
+      floatingActionButton: _showToTop
+          ? FloatingActionButton.small(
+              tooltip: 'Volver arriba',
+              onPressed: () => _scroll.animateTo(0,
+                  duration: const Duration(milliseconds: 350),
+                  curve: Curves.easeOutCubic),
+              child: const Icon(Icons.keyboard_arrow_up),
+            )
+          : null,
       body: async.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, _) => Center(child: Text('Error: $e')),
@@ -272,6 +306,7 @@ class _ChannelListScreenState extends ConsumerState<ChannelListScreen> {
 
   Widget _buildList(BuildContext context, List<MediaItem> items, bool wide) {
     return ListView.builder(
+      controller: _scroll,
       itemCount: items.length,
       itemBuilder: (_, i) {
         final it = items[i];
@@ -301,82 +336,214 @@ class _ChannelListScreenState extends ConsumerState<ChannelListScreen> {
     );
   }
 
+  /// Tamaños de la cuadrícula según la densidad elegida (S/M/L).
+  static const _tileExtents = [150.0, 195.0, 248.0];
+  static const _logoSizes = [56.0, 78.0, 100.0];
+
   Widget _buildGrid(BuildContext context, List<MediaItem> items, bool wide) {
+    final density = ref.watch(channelTileSizeProvider);
     return GridView.builder(
+      controller: _scroll,
       padding: const EdgeInsets.all(8),
-      gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-        maxCrossAxisExtent: 160,
-        childAspectRatio: 0.82,
+      gridDelegate: SliverGridDelegateWithMaxCrossAxisExtent(
+        maxCrossAxisExtent: _tileExtents[density],
+        childAspectRatio: 1.06,
         crossAxisSpacing: 8,
         mainAxisSpacing: 8,
       ),
       itemCount: items.length,
       itemBuilder: (_, i) {
         final it = items[i];
-        final selected = _selected?.id == it.id;
-        return Card(
-          clipBehavior: Clip.antiAlias,
-          color: selected
-              ? Theme.of(context).colorScheme.primaryContainer
-              : null,
-          child: InkWell(
-            onTap: () => _onTap(it, wide),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Expanded(
-                  child: Padding(
-                    padding: const EdgeInsets.all(8),
-                    child: Center(child: _logo(it, size: 64)),
-                  ),
-                ),
-                // Altura fija (2 líneas) para que el logo no se desplace según
-                // la longitud del nombre.
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 6),
-                  child: SizedBox(
-                    height: 34,
-                    child: Center(
-                      child: Text(
-                        it.name,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        textAlign: TextAlign.center,
-                        style: const TextStyle(fontSize: 12.5, height: 1.15),
-                      ),
-                    ),
-                  ),
-                ),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                  children: [
-                    IconButton(
-                      iconSize: 20,
-                      padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints(),
-                      visualDensity: VisualDensity.compact,
-                      icon: Icon(it.isFavorite
-                          ? Icons.favorite
-                          : Icons.favorite_border),
-                      onPressed: () => _action('favorito', it),
-                    ),
-                    IconButton(
-                      iconSize: 20,
-                      padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints(),
-                      visualDensity: VisualDensity.compact,
-                      icon: const Icon(Icons.fullscreen),
-                      tooltip: 'Pantalla completa',
-                      onPressed: () => _fullscreen(it),
-                    ),
-                    _menu(it),
-                  ],
-                ),
-              ],
+        return _ChannelCard(
+          logo: _logo(it, size: _logoSizes[density]),
+          name: it.name,
+          selected: _selected?.id == it.id,
+          favorite: it.isFavorite,
+          onTap: () => _onTap(it, wide),
+          onLongPress: () => _actionsSheet(it),
+          hoverActions: [
+            _hoverBtn(
+              it.isFavorite ? Icons.favorite : Icons.favorite_border,
+              'Favorito',
+              () => _action('favorito', it),
             ),
+            if (canOpenExternalViewer)
+              _hoverBtn(Icons.open_in_new, 'Abrir en ventana nueva',
+                  () => openExternalViewer(it)),
+            _hoverBtn(Icons.fullscreen, 'Pantalla completa',
+                () => _fullscreen(it)),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _hoverBtn(IconData icon, String tooltip, VoidCallback onTap) {
+    return IconButton(
+      iconSize: 17,
+      padding: const EdgeInsets.all(5),
+      constraints: const BoxConstraints(),
+      visualDensity: VisualDensity.compact,
+      tooltip: tooltip,
+      icon: Icon(icon),
+      onPressed: onTap,
+    );
+  }
+
+  /// Hoja de acciones del canal (pulsación larga: táctil / mando).
+  void _actionsSheet(MediaItem it) {
+    showModalBottomSheet<void>(
+      context: context,
+      builder: (sheet) {
+        void run(void Function() f) {
+          Navigator.pop(sheet);
+          f();
+        }
+
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ListTile(
+                title: Text(it.name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontWeight: FontWeight.w700)),
+              ),
+              const Divider(height: 1),
+              ListTile(
+                leading: const Icon(Icons.fullscreen),
+                title: const Text('Pantalla completa'),
+                onTap: () => run(() => _fullscreen(it)),
+              ),
+              ListTile(
+                leading: Icon(
+                    it.isFavorite ? Icons.favorite : Icons.favorite_border),
+                title: Text(it.isFavorite
+                    ? 'Quitar de favoritos'
+                    : 'Añadir a favoritos'),
+                onTap: () => run(() => _action('favorito', it)),
+              ),
+              if (canOpenExternalViewer)
+                ListTile(
+                  leading: const Icon(Icons.open_in_new),
+                  title: const Text('Abrir en ventana nueva'),
+                  onTap: () => run(() => openExternalViewer(it)),
+                ),
+              ListTile(
+                leading: const Icon(Icons.visibility_off_outlined),
+                title: const Text('Ocultar'),
+                onTap: () => run(() => _action('ocultar', it)),
+              ),
+              ListTile(
+                leading: const Icon(Icons.delete_outline),
+                title: const Text('Borrar'),
+                onTap: () => run(() => _action('borrar', it)),
+              ),
+            ],
           ),
         );
       },
+    );
+  }
+}
+
+/// Tile de canal: logo protagonista y nombre; las acciones aparecen al pasar
+/// el ratón (escritorio) o con pulsación larga (táctil/TV), para que la
+/// cuadrícula respire. El corazón marca los favoritos de forma permanente.
+class _ChannelCard extends StatefulWidget {
+  final Widget logo;
+  final String name;
+  final bool selected;
+  final bool favorite;
+  final VoidCallback onTap;
+  final VoidCallback onLongPress;
+  final List<Widget> hoverActions;
+  const _ChannelCard({
+    required this.logo,
+    required this.name,
+    required this.selected,
+    required this.favorite,
+    required this.onTap,
+    required this.onLongPress,
+    required this.hoverActions,
+  });
+
+  @override
+  State<_ChannelCard> createState() => _ChannelCardState();
+}
+
+class _ChannelCardState extends State<_ChannelCard> {
+  bool _hover = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      clipBehavior: Clip.antiAlias,
+      color: widget.selected
+          ? Theme.of(context).colorScheme.primaryContainer
+          : null,
+      child: InkWell(
+        onTap: widget.onTap,
+        onLongPress: widget.onLongPress,
+        child: MouseRegion(
+          onEnter: (_) => setState(() => _hover = true),
+          onExit: (_) => setState(() => _hover = false),
+          child: Stack(
+            children: [
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Expanded(
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(8, 10, 8, 4),
+                      child: Center(child: widget.logo),
+                    ),
+                  ),
+                  // Altura fija (2 líneas) para que el logo no baile según la
+                  // longitud del nombre.
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(6, 0, 6, 8),
+                    child: SizedBox(
+                      height: 32,
+                      child: Center(
+                        child: Text(
+                          widget.name,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(fontSize: 13, height: 1.15),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              if (widget.favorite)
+                const Positioned(
+                  top: 6,
+                  left: 6,
+                  child: Icon(Icons.favorite, size: 14, color: kAccent),
+                ),
+              if (_hover)
+                Positioned(
+                  top: 4,
+                  right: 4,
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: Colors.black.withValues(alpha: 0.65),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: widget.hoverActions,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

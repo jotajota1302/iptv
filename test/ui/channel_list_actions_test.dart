@@ -16,7 +16,8 @@ void main() {
   setUpAll(() => registerFallbackValue(const MediaItem(
       id: 'x', name: 'x', streamUrl: 'x', type: ContentType.live)));
 
-  testWidgets('el menu Ocultar invoca hideItem', (tester) async {
+  testWidgets('Ocultar desde la hoja de acciones invoca hideItem',
+      (tester) async {
     const item = MediaItem(
         id: 'a', name: 'La 1', streamUrl: 'u', type: ContentType.live);
     final repo = _MockRepo();
@@ -38,7 +39,8 @@ void main() {
     ));
     await tester.pumpAndSettle();
 
-    await tester.tap(find.byType(PopupMenuButton<String>));
+    // Pulsación larga sobre el tile → hoja de acciones → Ocultar.
+    await tester.longPress(find.text('La 1'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Ocultar'));
     await tester.pumpAndSettle();

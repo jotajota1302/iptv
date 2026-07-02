@@ -263,6 +263,17 @@ void setSortMode(WidgetRef ref, SortMode mode) {
   ref.read(sharedPrefsProvider).setInt('sort_mode', mode.index);
 }
 
+/// Tamaño de los tiles de la cuadrícula de canales (0=compacto, 1=medio,
+/// 2=grande). Persistido.
+final channelTileSizeProvider = StateProvider<int>((ref) =>
+    (ref.watch(sharedPrefsProvider).getInt('channel_tile_size') ?? 1)
+        .clamp(0, 2));
+
+void setChannelTileSize(WidgetRef ref, int value) {
+  ref.read(channelTileSizeProvider.notifier).state = value;
+  ref.read(sharedPrefsProvider).setInt('channel_tile_size', value);
+}
+
 /// Vista en cuadrícula (iconos) vs lista en la pantalla de canales. Persistido.
 final channelGridProvider = StateProvider<bool>(
     (ref) => ref.watch(sharedPrefsProvider).getBool('channel_grid') ?? true);
