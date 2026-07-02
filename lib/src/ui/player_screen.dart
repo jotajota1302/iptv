@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:media_kit_video/media_kit_video.dart';
@@ -134,6 +135,58 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
         );
   }
 
+  // --- Atajos de teclado (escritorio) ---
+  double? _mutedVolume;
+
+  void _seekBy(int seconds) {
+    final target = (_positionSeconds + seconds).clamp(0, _duration.inSeconds);
+    _ctrl.player.seek(Duration(seconds: target));
+  }
+
+  void _bumpVolume(double delta) {
+    _mutedVolume = null;
+    final v = (_ctrl.player.state.volume + delta).clamp(0.0, 100.0);
+    _ctrl.player.setVolume(v);
+  }
+
+  void _toggleMute() {
+    final p = _ctrl.player;
+    if (_mutedVolume == null) {
+      _mutedVolume = p.state.volume;
+      p.setVolume(0);
+    } else {
+      p.setVolume(_mutedVolume!);
+      _mutedVolume = null;
+    }
+  }
+
+  KeyEventResult _onKey(FocusNode node, KeyEvent e) {
+    if (e is! KeyDownEvent && e is! KeyRepeatEvent) {
+      return KeyEventResult.ignored;
+    }
+    final k = e.logicalKey;
+    if (k == LogicalKeyboardKey.space || k == LogicalKeyboardKey.keyK) {
+      _ctrl.player.playOrPause();
+    } else if (k == LogicalKeyboardKey.arrowLeft ||
+        k == LogicalKeyboardKey.keyJ) {
+      _seekBy(-10);
+    } else if (k == LogicalKeyboardKey.arrowRight ||
+        k == LogicalKeyboardKey.keyL) {
+      _seekBy(10);
+    } else if (k == LogicalKeyboardKey.arrowUp) {
+      _bumpVolume(5);
+    } else if (k == LogicalKeyboardKey.arrowDown) {
+      _bumpVolume(-5);
+    } else if (k == LogicalKeyboardKey.keyM) {
+      _toggleMute();
+    } else if (k == LogicalKeyboardKey.keyN && _hasNext) {
+      _playNext();
+    } else {
+      return KeyEventResult.ignored;
+    }
+    return KeyEventResult.handled;
+  }
+
   bool get _hasNext =>
       widget.queue != null && widget.queueIndex + 1 < widget.queue!.length;
 
@@ -234,13 +287,46 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     return actions;
   }
 
+  Widget _helpButton(BuildContext context) => IconButton(
+        icon: const Icon(Icons.keyboard_outlined),
+        tooltip: 'Atajos de teclado',
+        onPressed: () => showDialog<void>(
+          context: context,
+          builder: (_) => AlertDialog(
+            title: const Text('Atajos de teclado'),
+            content: const Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Espacio / K — Reproducir · Pausa'),
+                Text('← / → (J / L) — Retroceder · Avanzar 10 s'),
+                Text('↑ / ↓ — Subir · Bajar volumen'),
+                Text('M — Silenciar'),
+                Text('N — Siguiente episodio'),
+              ],
+            ),
+            actions: [
+              FilledButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('Entendido')),
+            ],
+          ),
+        ),
+      );
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text(widget.item.name), actions: _trackActions()),
+      appBar: AppBar(
+          title: Text(widget.item.name),
+          actions: [..._trackActions(), _helpButton(context)]),
       backgroundColor: Colors.black,
-      body: Center(
-        child: Video(controller: _video, fit: BoxFit.contain),
+      body: Focus(
+        autofocus: true,
+        onKeyEvent: _onKey,
+        child: Center(
+          child: Video(controller: _video, fit: BoxFit.contain),
+        ),
       ),
     );
   }
