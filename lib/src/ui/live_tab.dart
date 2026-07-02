@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../app/providers.dart';
 import '../domain/category.dart';
+import '../domain/content_type.dart';
 import 'channel_list_screen.dart';
 import 'widgets/category_tile.dart';
 
@@ -94,8 +95,10 @@ class LiveTab extends ConsumerWidget {
   /// Mini-collage con los primeros logos de la categoría; si no hay logos,
   /// vuelve al icono genérico de TV.
   Widget _collage(WidgetRef ref, Category cat) {
-    final logos =
-        ref.watch(liveCategoryLogosProvider).value?[cat.name] ?? const [];
+    final logos = ref
+            .watch(categoryLogosProvider(ContentType.live))
+            .value?[cat.name] ??
+        const [];
     if (logos.isEmpty) return const Icon(Icons.live_tv, size: 28);
     return Row(
       children: [

@@ -41,9 +41,11 @@ class PlaylistRepository {
         .toList();
   }
 
-  /// Hasta [max] logos por categoría en directo (collage de las tarjetas).
-  Future<Map<String, List<String>>> liveLogosByCategory({int max = 3}) async {
-    final all = await _db.itemsByType(ContentType.live);
+  /// Hasta [max] logos/carátulas por categoría de un tipo (para los collages
+  /// de las tarjetas de categorías de TV, Películas y Series).
+  Future<Map<String, List<String>>> logosByCategory(ContentType type,
+      {int max = 3}) async {
+    final all = await _db.itemsByType(type);
     final out = <String, List<String>>{};
     for (final it in all) {
       final logo = it.logoUrl;

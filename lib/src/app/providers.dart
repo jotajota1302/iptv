@@ -209,11 +209,20 @@ final liveByCategoryProvider =
   return ref.watch(hideDuplicatesProvider) ? dedupeChannels(items) : items;
 });
 
-/// Primeros logos de cada categoría de TV (collage de las tarjetas).
-final liveCategoryLogosProvider =
-    FutureProvider<Map<String, List<String>>>((ref) {
-  return ref.watch(playlistRepositoryProvider).liveLogosByCategory();
+/// Primeros logos/carátulas de cada categoría de un tipo (collages).
+final categoryLogosProvider =
+    FutureProvider.family<Map<String, List<String>>, ContentType>((ref, type) {
+  return ref.watch(playlistRepositoryProvider).logosByCategory(type);
 });
+
+/// Vista cuadrícula vs lista para las categorías de Películas y Series.
+final vodCategoryGridProvider = StateProvider<bool>((ref) =>
+    ref.watch(sharedPrefsProvider).getBool('vod_category_grid') ?? true);
+
+void setVodCategoryGrid(WidgetRef ref, bool value) {
+  ref.read(vodCategoryGridProvider.notifier).state = value;
+  ref.read(sharedPrefsProvider).setBool('vod_category_grid', value);
+}
 
 // --- VOD: películas y series ---
 
