@@ -30,8 +30,8 @@ class VodCategoryCard extends StatelessWidget {
         child: ClipRRect(
           borderRadius: BorderRadius.circular(big ? 8 : 6),
           child: SizedBox(
-            width: big ? 48 : 30,
-            height: big ? 70 : 44,
+            width: big ? 56 : 30,
+            height: big ? 84 : 44,
             child: CachedNetworkImage(
               imageUrl: url,
               fit: BoxFit.cover,
@@ -45,6 +45,7 @@ class VodCategoryCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final titleSize = big ? 17.0 : 15.0;
     return Card(
       clipBehavior: Clip.antiAlias,
       child: InkWell(
@@ -55,10 +56,13 @@ class VodCategoryCard extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Expanded(
                     child: posters.isEmpty
-                        ? Icon(fallbackIcon, size: big ? 40 : 28)
+                        ? Align(
+                            alignment: Alignment.centerLeft,
+                            child: Icon(fallbackIcon, size: big ? 40 : 28))
                         : Row(children: [
                             for (final p in posters.take(3)) _poster(p),
                           ]),
@@ -76,15 +80,28 @@ class VodCategoryCard extends StatelessWidget {
                 ],
               ),
               const Spacer(),
-              Text(
-                cat.name,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                    fontSize: big ? 17 : 15, fontWeight: FontWeight.w600),
+              // Bloque de título con altura reservada (2 líneas): los nombres
+              // largos no empujan el contenido fuera de la tarjeta y todas
+              // quedan alineadas.
+              SizedBox(
+                height: titleSize * 1.2 * 2 + 2,
+                child: Align(
+                  alignment: Alignment.bottomLeft,
+                  child: Text(
+                    cat.name,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                        fontSize: titleSize,
+                        height: 1.2,
+                        fontWeight: FontWeight.w600),
+                  ),
+                ),
               ),
               const SizedBox(height: 2),
               Text('${cat.itemCount} $countLabel',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                   style: Theme.of(context).textTheme.bodySmall),
             ],
           ),
