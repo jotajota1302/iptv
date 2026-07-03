@@ -170,28 +170,33 @@ class _SeriesTabState extends ConsumerState<SeriesTab> {
   Widget _grid(List<Category> cats) {
     final logos =
         ref.watch(categoryLogosProvider(ContentType.series)).value ?? const {};
-    return GridView.builder(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      padding: const EdgeInsets.all(8),
-      gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-        maxCrossAxisExtent: 210,
-        childAspectRatio: 1.35,
-        crossAxisSpacing: 8,
-        mainAxisSpacing: 8,
-      ),
-      itemCount: cats.length,
-      itemBuilder: (_, i) {
-        final cat = cats[i];
-        return VodCategoryCard(
-          cat: cat,
-          posters: logos[cat.name] ?? const [],
-          fallbackIcon: Icons.theaters_outlined,
-          countLabel: 'series',
-          onTap: () => _open(cat),
-          onHide: () => _hide(cat),
-        );
-      },
-    );
+    // Tarjetas más grandes en pantallas anchas (ver live_tab._buildGrid).
+    return LayoutBuilder(builder: (context, constraints) {
+      final big = constraints.maxWidth >= 1400;
+      return GridView.builder(
+        shrinkWrap: true,
+        physics: const NeverScrollableScrollPhysics(),
+        padding: const EdgeInsets.all(10),
+        gridDelegate: SliverGridDelegateWithMaxCrossAxisExtent(
+          maxCrossAxisExtent: big ? 330 : 210,
+          childAspectRatio: 1.35,
+          crossAxisSpacing: 10,
+          mainAxisSpacing: 10,
+        ),
+        itemCount: cats.length,
+        itemBuilder: (_, i) {
+          final cat = cats[i];
+          return VodCategoryCard(
+            cat: cat,
+            posters: logos[cat.name] ?? const [],
+            fallbackIcon: Icons.theaters_outlined,
+            countLabel: 'series',
+            big: big,
+            onTap: () => _open(cat),
+            onHide: () => _hide(cat),
+          );
+        },
+      );
+    });
   }
 }

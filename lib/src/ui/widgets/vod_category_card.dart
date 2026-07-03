@@ -11,6 +11,9 @@ class VodCategoryCard extends StatelessWidget {
   final String countLabel;
   final VoidCallback onTap;
   final VoidCallback onHide;
+
+  /// Tarjeta grande (pantallas anchas): carátulas y texto escalados.
+  final bool big;
   const VodCategoryCard({
     super.key,
     required this.cat,
@@ -19,15 +22,16 @@ class VodCategoryCard extends StatelessWidget {
     required this.countLabel,
     required this.onTap,
     required this.onHide,
+    this.big = false,
   });
 
   Widget _poster(String url) => Padding(
-        padding: const EdgeInsets.only(right: 5),
+        padding: EdgeInsets.only(right: big ? 8 : 5),
         child: ClipRRect(
-          borderRadius: BorderRadius.circular(6),
+          borderRadius: BorderRadius.circular(big ? 8 : 6),
           child: SizedBox(
-            width: 30,
-            height: 44,
+            width: big ? 48 : 30,
+            height: big ? 70 : 44,
             child: CachedNetworkImage(
               imageUrl: url,
               fit: BoxFit.cover,
@@ -46,7 +50,7 @@ class VodCategoryCard extends StatelessWidget {
       child: InkWell(
         onTap: onTap,
         child: Padding(
-          padding: const EdgeInsets.all(12),
+          padding: EdgeInsets.all(big ? 16 : 12),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -54,7 +58,7 @@ class VodCategoryCard extends StatelessWidget {
                 children: [
                   Expanded(
                     child: posters.isEmpty
-                        ? Icon(fallbackIcon, size: 28)
+                        ? Icon(fallbackIcon, size: big ? 40 : 28)
                         : Row(children: [
                             for (final p in posters.take(3)) _poster(p),
                           ]),
@@ -76,8 +80,8 @@ class VodCategoryCard extends StatelessWidget {
                 cat.name,
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
-                style:
-                    const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+                style: TextStyle(
+                    fontSize: big ? 17 : 15, fontWeight: FontWeight.w600),
               ),
               const SizedBox(height: 2),
               Text('${cat.itemCount} $countLabel',

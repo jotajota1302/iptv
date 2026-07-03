@@ -192,24 +192,26 @@ class _LiveTabState extends ConsumerState<LiveTab> {
   }
 
   /// Mini-collage con los primeros logos de la categoría; si no hay logos,
-  /// vuelve al icono genérico de TV.
-  Widget _collage(Category cat) {
+  /// vuelve al icono genérico de TV. [big] escala los logos en tarjetas
+  /// grandes (pantallas anchas).
+  Widget _collage(Category cat, {bool big = false}) {
     final logos = ref
             .watch(categoryLogosProvider(ContentType.live))
             .value?[cat.name] ??
         const [];
-    if (logos.isEmpty) return const Icon(Icons.live_tv, size: 28);
+    if (logos.isEmpty) return Icon(Icons.live_tv, size: big ? 40 : 28);
+    final size = big ? 48.0 : 30.0;
     return Row(
       children: [
         for (final url in logos)
           Container(
-            width: 30,
-            height: 30,
-            margin: const EdgeInsets.only(right: 5),
-            padding: const EdgeInsets.all(4),
+            width: size,
+            height: size,
+            margin: EdgeInsets.only(right: big ? 8 : 5),
+            padding: EdgeInsets.all(big ? 7 : 4),
             decoration: BoxDecoration(
               color: const Color(0xFFF7F8FA),
-              borderRadius: BorderRadius.circular(7),
+              borderRadius: BorderRadius.circular(big ? 10 : 7),
             ),
             child: CachedNetworkImage(
               imageUrl: url,
@@ -223,49 +225,56 @@ class _LiveTabState extends ConsumerState<LiveTab> {
   }
 
   Widget _buildGrid(List<Category> cats) {
-    return GridView.builder(
-      padding: const EdgeInsets.all(8),
-      gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-        maxCrossAxisExtent: 200,
-        childAspectRatio: 1.4,
-        crossAxisSpacing: 8,
-        mainAxisSpacing: 8,
-      ),
-      itemCount: cats.length,
-      itemBuilder: (_, i) {
-        final cat = cats[i];
-        return Card(
-          clipBehavior: Clip.antiAlias,
-          child: InkWell(
-            onTap: () => _open(cat),
-            child: Padding(
-              padding: const EdgeInsets.all(12),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Expanded(child: _collage(cat)),
-                      _menu(cat),
-                    ],
-                  ),
-                  const Spacer(),
-                  Text(
-                    cat.name,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                        fontSize: 15, fontWeight: FontWeight.w600),
-                  ),
-                  const SizedBox(height: 2),
-                  Text('${cat.itemCount} canales',
-                      style: Theme.of(context).textTheme.bodySmall),
-                ],
+    // En pantallas anchas las tarjetas escalan (menos por fila, más grandes):
+    // 11 tarjetas diminutas flotando en un monitor ultrapanorámico se veían
+    // perdidas.
+    return LayoutBuilder(builder: (context, constraints) {
+      final big = constraints.maxWidth >= 1400;
+      return GridView.builder(
+        padding: const EdgeInsets.all(10),
+        gridDelegate: SliverGridDelegateWithMaxCrossAxisExtent(
+          maxCrossAxisExtent: big ? 320 : 200,
+          childAspectRatio: 1.45,
+          crossAxisSpacing: 10,
+          mainAxisSpacing: 10,
+        ),
+        itemCount: cats.length,
+        itemBuilder: (_, i) {
+          final cat = cats[i];
+          return Card(
+            clipBehavior: Clip.antiAlias,
+            child: InkWell(
+              onTap: () => _open(cat),
+              child: Padding(
+                padding: EdgeInsets.all(big ? 16 : 12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(child: _collage(cat, big: big)),
+                        _menu(cat),
+                      ],
+                    ),
+                    const Spacer(),
+                    Text(
+                      cat.name,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                          fontSize: big ? 17 : 15,
+                          fontWeight: FontWeight.w600),
+                    ),
+                    const SizedBox(height: 2),
+                    Text('${cat.itemCount} canales',
+                        style: Theme.of(context).textTheme.bodySmall),
+                  ],
+                ),
               ),
             ),
-          ),
-        );
-      },
-    );
+          );
+        },
+      );
+    });
   }
 }
