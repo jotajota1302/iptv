@@ -5,12 +5,14 @@
 # Uso:  bash tool/use_libmpv_lgpl.sh [ruta/al/libmpv-lgpl-windows-x64.zip]
 #
 # El zip lo genera el workflow de CI `build-libmpv-lgpl` (artifact
-# libmpv-lgpl-windows-x64). Por defecto se busca en el Escritorio.
+# libmpv-lgpl-windows-x64). Por defecto se busca en la raíz del proyecto
+# (está gitignorado) y, si no, en el Escritorio.
 # El desarrollo diario puede seguir usando patch_libmpv.sh (build GPL
 # completo); este script es para las builds que se van a distribuir.
 set -euo pipefail
 
-ZIP="${1:-$HOME/Desktop/libmpv-lgpl-windows-x64.zip}"
+ZIP="${1:-libmpv-lgpl-windows-x64.zip}"
+[ -f "$ZIP" ] || ZIP="$HOME/Desktop/libmpv-lgpl-windows-x64.zip"
 # SHA256 de la libmpv-2.dll LGPL conocida (mpv 0.39 + FFmpeg n7.1, run
 # 28599441631). Si regeneras el paquete en CI, actualiza este valor con el
 # SHA256SUMS.txt del artifact.
