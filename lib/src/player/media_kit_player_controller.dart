@@ -1,20 +1,9 @@
 import 'dart:async';
 import 'package:media_kit/media_kit.dart';
+import '../domain/deinterlacer.dart';
 import 'player_controller.dart';
 
 class MediaKitPlayerController implements PlayerController {
-  // Candidatos de desentrelazado, del mejor (doble campo = 50/60p, mucho menos
-  // peine en movimiento rápido) al más básico. Se prueban EN ORDEN verificando
-  // con lectura de vuelta de `vf`: si mpv rechaza una cadena la deja vacía (sin
-  // lanzar excepción), así que se detecta y se pasa a la siguiente. El último
-  // (`bwdif` a secas) siempre funciona, por lo que nunca nos quedamos sin filtro.
-  // Requiere los fotogramas en CPU (hwdec software o auto-copy).
-  static const _deintCandidates = <String>[
-    'bwdif=mode=send_field',
-    'bwdif=mode=field',
-    'bwdif',
-  ];
-
   final Player player = Player();
   final _status = StreamController<PlayerStatus>.broadcast();
   final _subs = <StreamSubscription>[];
@@ -51,25 +40,33 @@ class MediaKitPlayerController implements PlayerController {
   /// efecto "peine" en contenido entrelazado (TV 1080i/576i). Con hwdec de tipo
   /// *copy* (d3d11va-copy / auto-copy) los fotogramas vuelven a CPU y el filtro
   /// se aplica; con hwdec directo (d3d11va) el filtro no ve los fotogramas.
-  Future<void> setDeinterlace(bool enabled) async {
+  Future<void> setDeinterlace(bool enabled, {List<String>? candidates}) async {
     final platform = player.platform;
-    if (platform is NativePlayer) await _applyDeintVf(platform, enabled);
+    if (platform is NativePlayer) {
+      await _applyDeintVf(platform, enabled, candidates);
+    }
   }
 
-  /// Fija el filtro de desentrelazado probando los candidatos en orden y
-  /// verificando con lectura de vuelta: se queda con el primero que mpv acepte
-  /// (el doble-campo, más suave). Si ninguno "de lujo" cuela, el último es
-  /// `bwdif` simple, que siempre funciona. Así nunca queda la imagen sin filtro.
-  Future<void> _applyDeintVf(NativePlayer p, bool enabled) async {
+  /// Fija el filtro de desentrelazado probando los [candidates] en orden y
+  /// verificando con lectura de vuelta: se queda con el primero que mpv acepte.
+  /// mpv rechaza una cadena inválida dejando `vf` vacío (sin lanzar excepción),
+  /// por eso se comprueba que el `vf` resultante contenga el nombre del filtro
+  /// pedido. Las listas de [deinterlacerCandidates] terminan siempre en `bwdif`,
+  /// así que un método no soportado nunca deja la imagen sin filtro. Por defecto
+  /// se usa `bwdif` (p. ej. la vista previa de canales, que no elige método).
+  Future<void> _applyDeintVf(
+      NativePlayer p, bool enabled, List<String>? candidates) async {
     if (!enabled) {
       await p.setProperty('vf', '');
       return;
     }
-    for (final f in _deintCandidates) {
+    final list = candidates ?? deinterlacerCandidates(Deinterlacer.bwdif);
+    for (final f in list) {
       await p.setProperty('vf', f);
       try {
         final applied = await p.getProperty('vf');
-        if (applied.contains('bwdif')) return; // aceptado por mpv
+        // El nombre del filtro es lo que va antes del primer '='.
+        if (applied.contains(f.split('=').first)) return; // aceptado por mpv
       } catch (_) {}
     }
   }
@@ -77,15 +74,18 @@ class MediaKitPlayerController implements PlayerController {
   /// Ajusta filtros y búfer según el contenido. NO toca `hwdec` (lo fija
   /// `enableHardwareAcceleration` al crear el controlador): cambiarlo tras abrir
   /// reinicializa el decodificador en Windows y descartaría el seek de reanudar.
-  /// - [deinterlace]: aplica `bwdif` (TV entrelazada) o ninguno (VOD progresivo).
+  /// - [deinterlace]: aplica el desentrelazado (TV entrelazada) o ninguno (VOD).
+  /// - [deintCandidates]: cadenas `vf` a probar (ver [deinterlacerCandidates]);
+  ///   por defecto `bwdif`.
   /// - [largeBuffer]: amplía el búfer del demuxer, útil para 4K de alto bitrate.
   Future<void> configure({
     required bool deinterlace,
+    List<String>? deintCandidates,
     bool largeBuffer = false,
   }) async {
     final p = player.platform;
     if (p is! NativePlayer) return;
-    await _applyDeintVf(p, deinterlace);
+    await _applyDeintVf(p, deinterlace, deintCandidates);
     await p.setProperty(
         'demuxer-max-bytes', largeBuffer ? '64MiB' : '16MiB');
     // Búfer hacia atrás amplio en VOD: permite retroceder a lo ya visto sin

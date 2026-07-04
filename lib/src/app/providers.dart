@@ -24,6 +24,7 @@ import '../domain/adult_filter.dart';
 import '../domain/category.dart';
 import '../domain/channel_dedupe.dart';
 import '../domain/content_type.dart';
+import '../domain/deinterlacer.dart';
 import '../domain/image_quality.dart';
 import '../domain/media_item.dart';
 import '../domain/series_group.dart';
@@ -344,6 +345,24 @@ final imageQualityProvider = StateProvider<ImageQuality>((ref) {
 void setImageQuality(WidgetRef ref, ImageQuality q) {
   ref.read(imageQualityProvider.notifier).state = q;
   ref.read(sharedPrefsProvider).setInt(_kImageQuality, q.index);
+}
+
+const _kDeinterlacer = 'deinterlacer_method';
+
+/// Método de desentrelazado del directo (bwdif por defecto; estdif opcional).
+/// Solo aplica cuando el desentrelazado está activado ([deinterlaceProvider]).
+/// Persistido en SharedPreferences como índice del enum.
+final deinterlacerProvider = StateProvider<Deinterlacer>((ref) {
+  final i = ref.watch(sharedPrefsProvider).getInt(_kDeinterlacer);
+  return i == null
+      ? Deinterlacer.bwdif
+      : Deinterlacer.values[i.clamp(0, Deinterlacer.values.length - 1)];
+});
+
+/// Persiste el método de desentrelazado y actualiza el estado.
+void setDeinterlacer(WidgetRef ref, Deinterlacer d) {
+  ref.read(deinterlacerProvider.notifier).state = d;
+  ref.read(sharedPrefsProvider).setInt(_kDeinterlacer, d.index);
 }
 
 /// Ocultar canales duplicados (mismo nombre) dentro de una categoría.

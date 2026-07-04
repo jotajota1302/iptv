@@ -9,6 +9,7 @@ import '../app/theme.dart';
 import '../data/epg_service.dart';
 import '../data/xmltv_service.dart';
 import '../domain/category.dart';
+import '../domain/deinterlacer.dart';
 import '../domain/media_item.dart';
 import '../domain/sort_mode.dart';
 import '../player/media_kit_player_controller.dart';
@@ -99,7 +100,8 @@ class _ChannelListScreenState extends ConsumerState<ChannelListScreen> {
     _ensurePreview();
     setState(() => _selected = it);
     await _previewCtrl!.open(it.streamUrl);
-    await _previewCtrl!.setDeinterlace(ref.read(deinterlaceProvider));
+    await _previewCtrl!.setDeinterlace(ref.read(deinterlaceProvider),
+        candidates: deinterlacerCandidates(ref.read(deinterlacerProvider)));
   }
 
   /// Abre el canal en pantalla completa. Pausa el preview antes (evita audio

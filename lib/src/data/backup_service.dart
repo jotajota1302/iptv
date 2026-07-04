@@ -9,6 +9,7 @@ const kBackupPrefsKeys = <String>[
   'parental_pin',
   'hardware_accel',
   'deinterlace',
+  'deinterlacer_method',
   'image_quality',
   'sort_mode',
   'channel_grid',

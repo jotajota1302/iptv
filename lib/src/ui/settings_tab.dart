@@ -11,6 +11,7 @@ import '../data/backup_service.dart';
 import '../data/update_service.dart';
 import '../domain/xtream_login.dart';
 import '../domain/content_type.dart';
+import '../domain/deinterlacer.dart';
 import '../domain/image_quality.dart';
 import '../domain/lang_match.dart';
 import '../domain/saved_playlist.dart';
@@ -321,6 +322,7 @@ class _SettingsTabState extends ConsumerState<SettingsTab> {
       ref.invalidate(parentalPinProvider);
       ref.invalidate(hardwareAccelProvider);
       ref.invalidate(deinterlaceProvider);
+      ref.invalidate(deinterlacerProvider);
       ref.invalidate(imageQualityProvider);
       ref.invalidate(sortModeProvider);
       ref.invalidate(channelGridProvider);
@@ -712,6 +714,42 @@ class _SettingsTabState extends ConsumerState<SettingsTab> {
           value: deinterlace,
           onChanged: (v) => setDeinterlaceSetting(ref, v),
         ),
+        if (deinterlace)
+          Padding(
+            padding: const EdgeInsets.only(left: 16, bottom: 8),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Método',
+                    style: TextStyle(
+                        fontSize: 13, color: Theme.of(context).hintColor)),
+                const SizedBox(height: 8),
+                SizedBox(
+                  width: double.infinity,
+                  child: SegmentedButton<Deinterlacer>(
+                    showSelectedIcon: false,
+                    style: const ButtonStyle(
+                      visualDensity: VisualDensity.compact,
+                    ),
+                    segments: [
+                      for (final d in Deinterlacer.values)
+                        ButtonSegment(value: d, label: Text(d.label)),
+                    ],
+                    selected: {ref.watch(deinterlacerProvider)},
+                    onSelectionChanged: (s) => setDeinterlacer(ref, s.first),
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Estándar (bwdif) suele ir bien. Detalle (estdif) puede '
+                  'verse mejor en movimiento según el canal; compara ambos. '
+                  'Aplica al abrir el vídeo.',
+                  style: TextStyle(
+                      fontSize: 12, color: Theme.of(context).hintColor),
+                ),
+              ],
+            ),
+          ),
         Padding(
           padding: const EdgeInsets.symmetric(vertical: 8),
           child: Column(

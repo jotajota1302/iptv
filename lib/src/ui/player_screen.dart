@@ -10,6 +10,7 @@ import '../app/desktop_window.dart';
 import '../app/providers.dart';
 import '../data/epg_service.dart';
 import '../domain/content_type.dart';
+import '../domain/deinterlacer.dart';
 import '../domain/image_quality.dart';
 import '../domain/lang_match.dart';
 import '../domain/media_item.dart';
@@ -146,6 +147,8 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     // VOD es progresivo (no entrelazado): sin bwdif y con búfer amplio para 4K.
     // TV en directo respeta el ajuste de desentrelazado.
     final deinterlace = isVod ? false : ref.read(deinterlaceProvider);
+    final deintCandidates =
+        deinterlacerCandidates(ref.read(deinterlacerProvider));
     _video = VideoController(
       _ctrl.player,
       configuration:
@@ -237,7 +240,10 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     }
     _ctrl.open(widget.item.streamUrl);
     // Config por tipo. bwdif requiere la libmpv completa (ver tool/patch_libmpv.sh).
-    _ctrl.configure(deinterlace: deinterlace, largeBuffer: isVod);
+    _ctrl.configure(
+        deinterlace: deinterlace,
+        deintCandidates: deintCandidates,
+        largeBuffer: isVod);
     // Calidad de imagen (escaladores/deband GPU) solo para VOD; "auto" se
     // resuelve por plataforma. Best-effort dentro del controlador.
     if (isVod) {
