@@ -891,14 +891,6 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
                       fontSize: 12.5, color: Colors.white70),
                 ),
               const Spacer(),
-              if (_buffering)
-                const Padding(
-                  padding: EdgeInsets.only(right: 12),
-                  child: SizedBox(
-                      width: 16,
-                      height: 16,
-                      child: CircularProgressIndicator(strokeWidth: 2)),
-                ),
               IconButton(
                 icon: Icon(_mutedVolume != null
                     ? Icons.volume_off
@@ -996,6 +988,27 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
             child: Stack(
               children: [
                 _videoView(),
+                // Indicador de carga central: visible siempre que el stream
+                // esté bufferando (p. ej. tras un salto), independiente de que
+                // la barra inferior esté oculta. Así un seek que tarda se ve
+                // como "cargando" y no como si estuviera colgado.
+                if (_buffering)
+                  const Center(
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        color: Colors.black45,
+                        shape: BoxShape.circle,
+                      ),
+                      child: Padding(
+                        padding: EdgeInsets.all(18),
+                        child: SizedBox(
+                          width: 46,
+                          height: 46,
+                          child: CircularProgressIndicator(strokeWidth: 3),
+                        ),
+                      ),
+                    ),
+                  ),
                 // Controles inferiores propios (progreso, play/pausa, volumen).
                 Positioned(
                   left: 0,
