@@ -11,6 +11,7 @@ import '../data/backup_service.dart';
 import '../data/update_service.dart';
 import '../domain/xtream_login.dart';
 import '../domain/content_type.dart';
+import '../domain/image_quality.dart';
 import '../domain/lang_match.dart';
 import '../domain/saved_playlist.dart';
 import 'management_screen.dart';
@@ -20,6 +21,14 @@ class SettingsTab extends ConsumerStatefulWidget {
   @override
   ConsumerState<SettingsTab> createState() => _SettingsTabState();
 }
+
+/// Etiqueta corta para el selector segmentado de calidad de imagen.
+String _qualityShort(ImageQuality q) => switch (q) {
+      ImageQuality.auto => 'Auto',
+      ImageQuality.alta => 'Alta',
+      ImageQuality.media => 'Media',
+      ImageQuality.off => 'Off',
+    };
 
 class _SettingsTabState extends ConsumerState<SettingsTab> {
   final _urlCtrl = TextEditingController();
@@ -312,6 +321,7 @@ class _SettingsTabState extends ConsumerState<SettingsTab> {
       ref.invalidate(parentalPinProvider);
       ref.invalidate(hardwareAccelProvider);
       ref.invalidate(deinterlaceProvider);
+      ref.invalidate(imageQualityProvider);
       ref.invalidate(sortModeProvider);
       ref.invalidate(channelGridProvider);
       ref.invalidate(categoryGridProvider);
@@ -701,6 +711,40 @@ class _SettingsTabState extends ConsumerState<SettingsTab> {
               '(1080i/576i). Recomendado activado. Aplica al abrir el vídeo.'),
           value: deinterlace,
           onChanged: (v) => setDeinterlaceSetting(ref, v),
+        ),
+        Padding(
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('Calidad de imagen (películas y series)',
+                  style: TextStyle(fontSize: 16)),
+              const SizedBox(height: 4),
+              Text(
+                'Mejora la nitidez del VOD con escaladores GPU y reduce el '
+                '"bandeado". Automática = Media en PC y desactivada en Android/'
+                'Fire TV. Alta pide GPU dedicada. Aplica al abrir el vídeo.',
+                style: TextStyle(
+                    fontSize: 13, color: Theme.of(context).hintColor),
+              ),
+              const SizedBox(height: 10),
+              SizedBox(
+                width: double.infinity,
+                child: SegmentedButton<ImageQuality>(
+                  showSelectedIcon: false,
+                  style: const ButtonStyle(
+                    visualDensity: VisualDensity.compact,
+                  ),
+                  segments: [
+                    for (final q in ImageQuality.values)
+                      ButtonSegment(value: q, label: Text(_qualityShort(q))),
+                  ],
+                  selected: {ref.watch(imageQualityProvider)},
+                  onSelectionChanged: (s) => setImageQuality(ref, s.first),
+                ),
+              ),
+            ],
+          ),
         ),
         SwitchListTile(
           contentPadding: EdgeInsets.zero,

@@ -46,8 +46,32 @@ class MediaKitPlayerController implements PlayerController {
     await p.setProperty('vf', deinterlace ? 'bwdif' : '');
     await p.setProperty(
         'demuxer-max-bytes', largeBuffer ? '64MiB' : '16MiB');
+    // Búfer hacia atrás amplio en VOD: permite retroceder a lo ya visto sin
+    // volver a descargar (el salto es instantáneo desde caché). En directo se
+    // mantiene pequeño (no tiene sentido retroceder mucho).
     await p.setProperty(
-        'demuxer-max-back-bytes', largeBuffer ? '32MiB' : '8MiB');
+        'demuxer-max-back-bytes', largeBuffer ? '128MiB' : '8MiB');
+    if (largeBuffer) {
+      // Saltos por la barra en streams por red: mantener la caché y permitir
+      // buscar DENTRO de ella sin reabrir la conexión (evita que el seek se
+      // "congele" al retroceder o avanzar a una zona ya descargada).
+      await p.setProperty('cache', 'yes');
+      await p.setProperty('demuxer-seekable-cache', 'yes');
+    }
+  }
+
+  /// Aplica el chain de "calidad de imagen" (escaladores/deband del renderer
+  /// GPU de mpv, vo=libmpv) a partir del mapa de propiedades ya resuelto
+  /// (ver imageQualityProps). Best-effort: cada setProperty va en try/catch para
+  /// que un valor no soportado nunca rompa la reproducción (cae a los defaults).
+  Future<void> setVideoQuality(Map<String, String> props) async {
+    final p = player.platform;
+    if (p is! NativePlayer) return;
+    for (final e in props.entries) {
+      try {
+        await p.setProperty(e.key, e.value);
+      } catch (_) {}
+    }
   }
 
   /// Propiedades técnicas del stream en curso, para "Información del stream".

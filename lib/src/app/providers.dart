@@ -24,6 +24,7 @@ import '../domain/adult_filter.dart';
 import '../domain/category.dart';
 import '../domain/channel_dedupe.dart';
 import '../domain/content_type.dart';
+import '../domain/image_quality.dart';
 import '../domain/media_item.dart';
 import '../domain/series_group.dart';
 import '../domain/sort_mode.dart';
@@ -325,6 +326,24 @@ void setHardwareAccel(WidgetRef ref, bool value) {
 void setDeinterlaceSetting(WidgetRef ref, bool value) {
   ref.read(deinterlaceProvider.notifier).state = value;
   ref.read(sharedPrefsProvider).setBool(_kDeinterlace, value);
+}
+
+const _kImageQuality = 'image_quality';
+
+/// Calidad de imagen (escaladores/deband GPU de mpv) aplicada al VOD. Por
+/// defecto "Automática" (se resuelve por plataforma al abrir el vídeo).
+/// Persistido en SharedPreferences como índice del enum.
+final imageQualityProvider = StateProvider<ImageQuality>((ref) {
+  final i = ref.watch(sharedPrefsProvider).getInt(_kImageQuality);
+  return i == null
+      ? ImageQuality.auto
+      : ImageQuality.values[i.clamp(0, ImageQuality.values.length - 1)];
+});
+
+/// Persiste la calidad de imagen y actualiza el estado.
+void setImageQuality(WidgetRef ref, ImageQuality q) {
+  ref.read(imageQualityProvider.notifier).state = q;
+  ref.read(sharedPrefsProvider).setInt(_kImageQuality, q.index);
 }
 
 /// Ocultar canales duplicados (mismo nombre) dentro de una categoría.

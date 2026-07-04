@@ -213,7 +213,10 @@ class MovieDetailScreen extends ConsumerWidget {
         Expanded(
           child: FilledButton.icon(
             onPressed: () async {
-              await openPlayer(context, item);
+              final fromStart =
+                  await chooseStartFromBeginning(context, ref, item);
+              if (fromStart == null || !context.mounted) return;
+              await openPlayer(context, item, fromBeginning: fromStart);
               ref.invalidate(continueWatchingProvider);
               ref.invalidate(moviesByCategoryProvider(cat));
             },

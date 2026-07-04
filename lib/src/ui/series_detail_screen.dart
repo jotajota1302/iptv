@@ -10,6 +10,7 @@ import '../data/series_info_service.dart';
 import '../data/tmdb_service.dart';
 import '../domain/series_group.dart';
 import '../domain/trailer_url.dart';
+import 'play_helpers.dart';
 import 'player_screen.dart';
 import 'widgets/cast_rail.dart';
 
@@ -38,11 +39,14 @@ class _SeriesDetailScreenState extends ConsumerState<SeriesDetailScreen> {
   String get _anyEpisodeUrl =>
       series.seasons[series.sortedSeasons.first]!.first.item.streamUrl;
 
-  void _play(List<Episode> episodes, Episode e) {
+  void _play(List<Episode> episodes, Episode e) async {
+    final fromStart = await chooseStartFromBeginning(context, ref, e.item);
+    if (fromStart == null || !mounted) return;
     Navigator.of(context).push(MaterialPageRoute(
       builder: (_) => PlayerScreen(
         item: e.item,
         resume: true,
+        startFromBeginning: fromStart,
         queue: [for (final x in episodes) x.item],
         queueIndex: episodes.indexOf(e),
       ),

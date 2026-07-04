@@ -1,6 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:io' show exit;
+import 'dart:io' show exit, Platform;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -10,6 +10,7 @@ import '../app/desktop_window.dart';
 import '../app/providers.dart';
 import '../data/epg_service.dart';
 import '../domain/content_type.dart';
+import '../domain/image_quality.dart';
 import '../domain/lang_match.dart';
 import '../domain/media_item.dart';
 import '../player/media_kit_player_controller.dart';
@@ -33,6 +34,11 @@ class PlayerScreen extends ConsumerStatefulWidget {
   /// progreso. En directo (false) no aplica.
   final bool resume;
 
+  /// Si es true, ignora la posición guardada y empieza desde el principio (pero
+  /// sigue guardando el progreso). Lo decide el diálogo "Continuar / Desde el
+  /// principio" al abrir un VOD con progreso.
+  final bool startFromBeginning;
+
   /// Cola de reproducción (p. ej. episodios de una temporada) para auto‑pasar
   /// al siguiente al terminar. Null = sin cola.
   final List<MediaItem>? queue;
@@ -46,6 +52,7 @@ class PlayerScreen extends ConsumerStatefulWidget {
     super.key,
     required this.item,
     this.resume = false,
+    this.startFromBeginning = false,
     this.queue,
     this.queueIndex = 0,
     this.viewerWindow = false,
@@ -188,10 +195,23 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
         if (done) _playNext();
       }));
     }
-    if (widget.resume) _setupResume();
+    // Reanudar desde lo guardado, salvo que se pida empezar desde el principio
+    // (en ese caso marcamos _seeked para que no salte, pero seguimos guardando).
+    if (widget.resume && !widget.startFromBeginning) {
+      _setupResume();
+    } else if (widget.startFromBeginning) {
+      _seeked = true;
+    }
     _ctrl.open(widget.item.streamUrl);
     // Config por tipo. bwdif requiere la libmpv completa (ver tool/patch_libmpv.sh).
     _ctrl.configure(deinterlace: deinterlace, largeBuffer: isVod);
+    // Calidad de imagen (escaladores/deband GPU) solo para VOD; "auto" se
+    // resuelve por plataforma. Best-effort dentro del controlador.
+    if (isVod) {
+      final q = resolveImageQuality(ref.read(imageQualityProvider),
+          isAndroid: Platform.isAndroid);
+      _ctrl.setVideoQuality(imageQualityProps(q));
+    }
   }
 
   /// Configura la lógica de reanudar: lee la posición guardada de la BD (fuente
@@ -748,17 +768,27 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
         ),
       );
 
-  /// Menú de desbordamiento: info del stream y atajos.
+  /// Menú de desbordamiento: reiniciar (VOD), info del stream y atajos.
   Widget _moreMenu() => PopupMenuButton<String>(
         tooltip: 'Más opciones',
-        onSelected: (v) => v == 'stats' ? _showStats() : _showHelp(),
-        itemBuilder: (_) => const [
-          PopupMenuItem(
+        onSelected: (v) => switch (v) {
+          'restart' => _seekTo(0),
+          'stats' => _showStats(),
+          _ => _showHelp(),
+        },
+        itemBuilder: (_) => [
+          if (!_isLive)
+            const PopupMenuItem(
+                value: 'restart',
+                child: ListTile(
+                    leading: Icon(Icons.replay),
+                    title: Text('Reiniciar desde el principio'))),
+          const PopupMenuItem(
               value: 'stats',
               child: ListTile(
                   leading: Icon(Icons.monitor_heart_outlined),
                   title: Text('Información del stream'))),
-          PopupMenuItem(
+          const PopupMenuItem(
               value: 'ayuda',
               child: ListTile(
                   leading: Icon(Icons.keyboard_outlined),
