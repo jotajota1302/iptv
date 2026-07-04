@@ -82,6 +82,18 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
   // emite; sin esto la barra "vuelve atrás" un instante al soltar.
   DateTime _ignoreStreamUntil = DateTime.fromMillisecondsSinceEpoch(0);
 
+  // Reconexión automática en directo: si el stream cae (EOF), se reabre el
+  // mismo canal en vez de pararse o saltar al siguiente.
+  bool _reconnecting = false;
+  int _reconnectAttempts = 0;
+  Timer? _reconnectTimer;
+  static const _maxReconnectAttempts = 8;
+  // Vigía de "congelado": un directo que se cae normalmente NO emite EOF, solo
+  // se queda en buffering para siempre. Si el buffer no se resuelve en este
+  // tiempo, se da el canal por caído y se reabre (ver [_watchLiveStall]).
+  Timer? _stallTimer;
+  static const _liveStallTimeout = Duration(seconds: 10);
+
   // Pistas disponibles (audio/subtítulos) para poder elegirlas.
   List<AudioTrack> _audioTracks = [];
   List<SubtitleTrack> _subtitleTracks = [];
@@ -142,6 +154,13 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     _subs.add(_ctrl.player.stream.playing.listen((p) {
       if (!mounted) return;
       setState(() => _playing = p);
+      // Reproducción en marcha: reconexión superada, se resetea el contador.
+      if (p && (_reconnecting || _reconnectAttempts > 0)) {
+        setState(() {
+          _reconnecting = false;
+          _reconnectAttempts = 0;
+        });
+      }
       // En pausa la barra queda visible; al reproducir se oculta sola.
       if (!p) {
         _uiTimer?.cancel();
@@ -177,6 +196,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     }));
     _subs.add(_ctrl.player.stream.buffering.listen((b) {
       if (mounted && b != _buffering) setState(() => _buffering = b);
+      if (_isLive) _watchLiveStall(b);
     }));
     _subs.add(_ctrl.player.stream.track.listen((t) {
       if (mounted) setState(() => _currentTracks = t);
@@ -189,18 +209,31 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
       });
       _applyPreferredTracks(t);
     }));
-    // Auto‑pasar al siguiente episodio al terminar (si hay cola).
-    if (_hasNext) {
-      _subs.add(_ctrl.player.stream.completed.listen((done) {
-        if (done) _playNext();
-      }));
-    }
+    // Al terminar el stream: en directo se reconecta el MISMO canal (un directo
+    // no "acaba", es que se ha caído); en VOD con cola pasa al siguiente.
+    _subs.add(_ctrl.player.stream.completed.listen((done) {
+      if (!done || !mounted || _advanced) return;
+      if (_isLive) {
+        debugPrint('[live] EOF (completed) → reconectando');
+        _tryReconnect();
+      } else if (_hasNext) {
+        _playNext();
+      }
+    }));
     // Reanudar desde lo guardado, salvo que se pida empezar desde el principio
     // (en ese caso marcamos _seeked para que no salte, pero seguimos guardando).
     if (widget.resume && !widget.startFromBeginning) {
       _setupResume();
     } else if (widget.startFromBeginning) {
       _seeked = true;
+    }
+    // Directo entrelazado + aceleración por hardware: `auto-copy` devuelve los
+    // fotogramas a CPU para que `bwdif` desentrelace SIN renunciar a la GPU
+    // (se fija ANTES de abrir para no reinicializar el decodificador). En VOD
+    // no se toca el hwdec (es progresivo y así se preserva el seek de reanudar);
+    // con aceleración apagada, hwdec ya es software y bwdif funciona igual.
+    if (_isLive && deinterlace && hwAccel) {
+      _ctrl.setHwdec('auto-copy');
     }
     _ctrl.open(widget.item.streamUrl);
     // Config por tipo. bwdif requiere la libmpv completa (ver tool/patch_libmpv.sh).
@@ -389,7 +422,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     }
     final k = e.logicalKey;
     if (k == LogicalKeyboardKey.space || k == LogicalKeyboardKey.keyK) {
-      _ctrl.player.playOrPause();
+      _onPlayPause();
     } else if (k == LogicalKeyboardKey.arrowLeft ||
         k == LogicalKeyboardKey.keyJ) {
       _seekBy(-10);
@@ -457,6 +490,55 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
           duration: _duration.inSeconds);
     }
     _playAt(widget.queueIndex + 1);
+  }
+
+  /// Vigía de directo: un stream en vivo que se congela normalmente NO emite
+  /// EOF (`completed`), solo se queda en buffering indefinidamente. Si el buffer
+  /// sigue sin resolverse pasado [_liveStallTimeout], se da el canal por caído y
+  /// se reabre. Cada transición de buffering rearma el temporizador; al volver a
+  /// fluir (buffering=false) se cancela.
+  void _watchLiveStall(bool buffering) {
+    _stallTimer?.cancel();
+    if (!buffering || _advanced) return;
+    _stallTimer = Timer(_liveStallTimeout, () {
+      if (!mounted || !_isLive || _advanced) return;
+      // Se relee el estado real del reproductor por si ya se resolvió.
+      if (_ctrl.player.state.buffering) {
+        debugPrint('[live] congelado >${_liveStallTimeout.inSeconds}s '
+            '→ reconectando (intento ${_reconnectAttempts + 1})');
+        _tryReconnect();
+      }
+    });
+  }
+
+  /// Reabre el canal en directo tras un corte, con un tope de reintentos. El
+  /// contador se resetea solo cuando vuelve a reproducir (listener de playing).
+  void _tryReconnect() {
+    if (_advanced || !mounted) return;
+    if (_reconnectAttempts >= _maxReconnectAttempts) {
+      if (_reconnecting) setState(() => _reconnecting = false);
+      return; // se rinde: el usuario puede reintentar con ▶
+    }
+    _reconnectAttempts++;
+    setState(() => _reconnecting = true);
+    _reconnectTimer?.cancel();
+    _reconnectTimer = Timer(const Duration(milliseconds: 1500), () {
+      if (mounted && !_advanced) _ctrl.open(widget.item.streamUrl);
+    });
+  }
+
+  /// Play/pausa del botón. En directo, si el stream está parado (se cayó), lo
+  /// reabre en vez de intentar reanudar algo que ya no existe.
+  void _onPlayPause() {
+    debugPrint('[player] play/pausa (live=$_isLive, reproduciendo=$_playing)');
+    if (_isLive && !_playing) {
+      _reconnectAttempts = 0;
+      setState(() => _reconnecting = false);
+      _reconnectTimer?.cancel();
+      _ctrl.open(widget.item.streamUrl);
+    } else {
+      _ctrl.player.playOrPause();
+    }
   }
 
   /// Etiquetas únicas para el menú: las pistas con el mismo título/idioma
@@ -603,6 +685,8 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     _osdTimer?.cancel();
     _uiTimer?.cancel();
     _numTimer?.cancel();
+    _reconnectTimer?.cancel();
+    _stallTimer?.cancel();
     if (_fullscreen) setWindowFullScreen(false);
     // 1) Cortar el audio LO PRIMERO, pase lo que pase con el resto.
     final ctrl = _ctrl;
@@ -874,7 +958,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
                     size: 30),
                 tooltip: _playing ? 'Pausa (Espacio)' : 'Reproducir (Espacio)',
                 onPressed: () {
-                  _ctrl.player.playOrPause();
+                  _onPlayPause();
                   _pokeUi();
                 },
               ),
@@ -1022,7 +1106,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
                 // esté bufferando (p. ej. tras un salto), independiente de que
                 // la barra inferior esté oculta. Así un seek que tarda se ve
                 // como "cargando" y no como si estuviera colgado.
-                if (_buffering)
+                if (_buffering && !_reconnecting)
                   const Center(
                     child: DecoratedBox(
                       decoration: BoxDecoration(
@@ -1036,6 +1120,33 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
                           height: 46,
                           child: CircularProgressIndicator(strokeWidth: 3),
                         ),
+                      ),
+                    ),
+                  ),
+                // Aviso de reconexión en directo (el stream se cayó y se está
+                // reabriendo el mismo canal).
+                if (_reconnecting)
+                  Center(
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 20, vertical: 16),
+                      decoration: BoxDecoration(
+                        color: Colors.black54,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: const Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          SizedBox(
+                              width: 40,
+                              height: 40,
+                              child:
+                                  CircularProgressIndicator(strokeWidth: 3)),
+                          SizedBox(height: 12),
+                          Text('Reconectando…',
+                              style: TextStyle(
+                                  fontSize: 14, fontWeight: FontWeight.w600)),
+                        ],
                       ),
                     ),
                   ),
