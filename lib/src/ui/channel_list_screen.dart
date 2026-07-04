@@ -205,7 +205,11 @@ class _ChannelListScreenState extends ConsumerState<ChannelListScreen> {
               ),
             )),
           ),
-          const SortMenu(showCustom: true),
+          SortMenu(
+            current: sort,
+            modes: channelSortModes(showCustom: true),
+            onSelected: (m) => setSortMode(ref, m),
+          ),
           if (grid)
             PopupMenuButton<int>(
               icon: const Icon(Icons.photo_size_select_large),

@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:iptv_player/src/domain/content_type.dart';
 import 'package:iptv_player/src/domain/media_item.dart';
+import 'package:iptv_player/src/domain/series_group.dart';
 import 'package:iptv_player/src/domain/sort_mode.dart';
 
 MediaItem it(String name, {int added = 0, bool fav = false}) => MediaItem(
@@ -50,5 +51,103 @@ void main() {
         sortItems(items, SortMode.custom, customOrder: const [])
             .map((e) => e.name),
         ['Beta', 'alfa', 'Gamma']);
+  });
+
+  group('orden por año', () {
+    final byYear = [
+      it('Vieja (2001)'),
+      it('Sin año'),
+      it('Nueva (2020)'),
+      it('Media (2010)'),
+    ];
+
+    test('yearDesc ordena de más nueva a más vieja, sin año al final', () {
+      expect(sortItems(byYear, SortMode.yearDesc).map((e) => e.name),
+          ['Nueva (2020)', 'Media (2010)', 'Vieja (2001)', 'Sin año']);
+    });
+
+    test('yearAsc ordena de más vieja a más nueva, sin año al final', () {
+      expect(sortItems(byYear, SortMode.yearAsc).map((e) => e.name),
+          ['Vieja (2001)', 'Media (2010)', 'Nueva (2020)', 'Sin año']);
+    });
+  });
+
+  group('novedades (newest)', () {
+    test('ordena por addedAt desc y desempata por año desc', () {
+      final list = [
+        it('Añadida antes (2000)', added: 500),
+        it('Añadida después vieja (2005)', added: 100),
+        it('Añadida después nueva (2024)', added: 100),
+      ];
+      expect(sortItems(list, SortMode.newest).map((e) => e.name), [
+        'Añadida antes (2000)',
+        'Añadida después nueva (2024)',
+        'Añadida después vieja (2005)',
+      ]);
+    });
+
+    test('con mismo addedAt, la que no tiene año va al final', () {
+      final list = [
+        it('Sin año', added: 100),
+        it('Con año (2015)', added: 100),
+      ];
+      expect(sortItems(list, SortMode.newest).map((e) => e.name),
+          ['Con año (2015)', 'Sin año']);
+    });
+  });
+
+  group('sortSeriesGroups', () {
+    SeriesGroup grp(String title, {int year = 0, int added = 0}) => SeriesGroup(
+          title: title,
+          seasons: {
+            1: [
+              Episode(
+                item: MediaItem(
+                    id: title,
+                    name: year == 0 ? title : '$title ($year) S01E01',
+                    streamUrl: 'u',
+                    addedAt: added),
+                season: 1,
+                episode: 1,
+              ),
+            ],
+          },
+        );
+
+    final groups = [
+      grp('Beta', year: 2005),
+      grp('alfa'),
+      grp('Gamma', year: 2020),
+    ];
+
+    test('nameAsc ignora mayúsculas', () {
+      expect(sortSeriesGroups(groups, SortMode.nameAsc).map((e) => e.title),
+          ['alfa', 'Beta', 'Gamma']);
+    });
+
+    test('nameDesc invierte', () {
+      expect(sortSeriesGroups(groups, SortMode.nameDesc).map((e) => e.title),
+          ['Gamma', 'Beta', 'alfa']);
+    });
+
+    test('yearDesc: más nueva primero, sin año al final', () {
+      expect(sortSeriesGroups(groups, SortMode.yearDesc).map((e) => e.title),
+          ['Gamma', 'Beta', 'alfa']);
+    });
+
+    test('yearAsc: más vieja primero, sin año al final', () {
+      expect(sortSeriesGroups(groups, SortMode.yearAsc).map((e) => e.title),
+          ['Beta', 'Gamma', 'alfa']);
+    });
+
+    test('newest: por addedAt desc y desempate por año desc', () {
+      final list = [
+        grp('Antes', year: 2000, added: 500),
+        grp('Después vieja', year: 2005, added: 100),
+        grp('Después nueva', year: 2024, added: 100),
+      ];
+      expect(sortSeriesGroups(list, SortMode.newest).map((e) => e.title),
+          ['Antes', 'Después nueva', 'Después vieja']);
+    });
   });
 }

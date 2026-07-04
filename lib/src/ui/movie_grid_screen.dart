@@ -21,6 +21,9 @@ class MovieGridScreen extends ConsumerStatefulWidget {
 
 class _MovieGridScreenState extends ConsumerState<MovieGridScreen> {
   String _query = '';
+  // Cada vez que se entra en una categoría se arranca en "Novedades"; el cambio
+  // de orden solo afecta a esta vista y no se recuerda entre entradas.
+  SortMode _sort = SortMode.newest;
 
   void _refresh() {
     ref.invalidate(moviesByCategoryProvider(widget.category.name));
@@ -75,10 +78,14 @@ class _MovieGridScreenState extends ConsumerState<MovieGridScreen> {
   @override
   Widget build(BuildContext context) {
     final async = ref.watch(moviesByCategoryProvider(widget.category.name));
-    final sort = ref.watch(sortModeProvider);
     return Scaffold(
-      appBar: AppBar(
-          title: Text(widget.category.name), actions: const [SortMenu()]),
+      appBar: AppBar(title: Text(widget.category.name), actions: [
+        SortMenu(
+          current: _sort,
+          modes: kVodSortModes,
+          onSelected: (m) => setState(() => _sort = m),
+        ),
+      ]),
       body: Column(
         children: [
           Padding(
@@ -103,7 +110,7 @@ class _MovieGridScreenState extends ConsumerState<MovieGridScreen> {
                     : all
                         .where((m) => m.name.toLowerCase().contains(_query))
                         .toList();
-                final movies = sortItems(filtered, sort);
+                final movies = sortItems(filtered, _sort);
                 if (movies.isEmpty) {
                   return const Center(child: Text('Sin resultados'));
                 }

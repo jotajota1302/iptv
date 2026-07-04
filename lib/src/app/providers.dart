@@ -533,6 +533,7 @@ void setSortMode(WidgetRef ref, SortMode mode) {
   ref.read(sharedPrefsProvider).setInt('sort_mode', mode.index);
 }
 
+
 /// Orden personalizado de canales por categoría (drag & drop): nombre de la
 /// categoría -> lista de ids en el orden elegido. Persistido.
 final channelOrderProvider =

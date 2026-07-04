@@ -20,15 +20,22 @@ class SeriesGridScreen extends ConsumerStatefulWidget {
 
 class _SeriesGridScreenState extends ConsumerState<SeriesGridScreen> {
   String _query = '';
+  // Cada vez que se entra en una categoría se arranca en "Novedades"; el cambio
+  // de orden solo afecta a esta vista y no se recuerda entre entradas.
+  SortMode _sort = SortMode.newest;
 
   @override
   Widget build(BuildContext context) {
     final async =
         ref.watch(seriesGroupsByCategoryProvider(widget.category.name));
-    final sort = ref.watch(sortModeProvider);
     return Scaffold(
-      appBar: AppBar(
-          title: Text(widget.category.name), actions: const [SortMenu()]),
+      appBar: AppBar(title: Text(widget.category.name), actions: [
+        SortMenu(
+          current: _sort,
+          modes: kVodSortModes,
+          onSelected: (m) => setState(() => _sort = m),
+        ),
+      ]),
       body: Column(
         children: [
           Padding(
@@ -53,14 +60,7 @@ class _SeriesGridScreenState extends ConsumerState<SeriesGridScreen> {
                     : all
                         .where((s) => s.title.toLowerCase().contains(_query))
                         .toList();
-                final series = [...filtered];
-                if (sort == SortMode.nameDesc) {
-                  series.sort((a, b) =>
-                      b.title.toLowerCase().compareTo(a.title.toLowerCase()));
-                } else {
-                  series.sort((a, b) =>
-                      a.title.toLowerCase().compareTo(b.title.toLowerCase()));
-                }
+                final series = sortSeriesGroups(filtered, _sort);
                 if (series.isEmpty) {
                   return const Center(child: Text('Sin resultados'));
                 }

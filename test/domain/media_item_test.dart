@@ -28,4 +28,19 @@ void main() {
     expect(deleted.isDeleted, true);
     expect(deleted.isHidden, false);
   });
+
+  MediaItem named(String name) =>
+      MediaItem(id: name, name: name, streamUrl: 'u');
+
+  test('releaseYear extrae el año entre paréntesis del título', () {
+    expect(named('Oppenheimer (2023)').releaseYear, 2023);
+    expect(named('[4K] Matrix (1999) LATINO').releaseYear, 1999);
+    expect(named('ES| Peli (2020)').releaseYear, 2020);
+  });
+
+  test('releaseYear es 0 cuando el título no trae año', () {
+    expect(named('Peli sin año').releaseYear, 0);
+    expect(named('Documental 2021 sin paréntesis').releaseYear, 0);
+    expect(named('Cosa (1850)').releaseYear, 0);
+  });
 }

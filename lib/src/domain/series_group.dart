@@ -23,4 +23,28 @@ class SeriesGroup {
   /// Total de episodios en todas las temporadas.
   int get episodeCount =>
       seasons.values.fold(0, (sum, list) => sum + list.length);
+
+  /// Año de estreno de la serie: el mayor año entre sus episodios (tomado del
+  /// título del proveedor). 0 = desconocido si ninguno lo trae.
+  int get year {
+    var max = 0;
+    for (final list in seasons.values) {
+      for (final e in list) {
+        if (e.item.releaseYear > max) max = e.item.releaseYear;
+      }
+    }
+    return max;
+  }
+
+  /// Marca de "recién añadido" de la serie: el mayor addedAt entre sus
+  /// episodios (el episodio más recientemente añadido a la lista).
+  int get addedAt {
+    var max = 0;
+    for (final list in seasons.values) {
+      for (final e in list) {
+        if (e.item.addedAt > max) max = e.item.addedAt;
+      }
+    }
+    return max;
+  }
 }

@@ -37,6 +37,13 @@ class MediaItem {
     this.addedAt = 0,
   });
 
+  /// Año de estreno tomado del título del proveedor ("Película (2023)").
+  /// 0 = desconocido (el título no trae año entre paréntesis).
+  int get releaseYear {
+    final m = RegExp(r'\(((?:19|20)\d{2})\)').firstMatch(name);
+    return m == null ? 0 : int.parse(m.group(1)!);
+  }
+
   /// Fracción vista (0..1) si se conoce la duración; si no, 0.
   double get watchedFraction =>
       durationSeconds > 0 ? (positionSeconds / durationSeconds).clamp(0, 1) : 0;
