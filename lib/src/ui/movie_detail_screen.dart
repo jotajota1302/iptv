@@ -52,9 +52,12 @@ class MovieDetailScreen extends ConsumerWidget {
           SliverAppBar(
             expandedHeight: 400,
             pinned: true,
-            stretch: true,
             backgroundColor: kBackground,
             flexibleSpace: FlexibleSpaceBar(
+              // El cabecero se fija al colapsar (sin parallax ni zoom): así la
+              // carátula no se desplaza ni se redimensiona al hacer scroll, solo
+              // se recorta limpiamente bajo la barra.
+              collapseMode: CollapseMode.pin,
               // Backdrop de fondo con el póster grande centrado encima,
               // estilo cartelera (el pequeño a la izquierda quedaba perdido).
               background: Stack(
@@ -93,7 +96,6 @@ class MovieDetailScreen extends ConsumerWidget {
                   ),
                 ],
               ),
-              stretchModes: const [StretchMode.zoomBackground],
             ),
           ),
           SliverToBoxAdapter(
