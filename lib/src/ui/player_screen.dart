@@ -149,10 +149,17 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     final deinterlace = isVod ? false : ref.read(deinterlaceProvider);
     final deintCandidates =
         deinterlacerCandidates(ref.read(deinterlacerProvider));
+    // El hwdec va en la configuración porque el VideoController escribe su
+    // propio `hwdec` (default `auto`) de forma asíncrona al crearse: un
+    // setProperty a mano entra en carrera con esa escritura y puede quedar
+    // pisado (desentrelazado intermitente). Ver [initialHwdec].
     _video = VideoController(
       _ctrl.player,
-      configuration:
-          VideoControllerConfiguration(enableHardwareAcceleration: hwAccel),
+      configuration: VideoControllerConfiguration(
+        enableHardwareAcceleration: hwAccel,
+        hwdec: initialHwdec(
+            live: _isLive, deinterlace: deinterlace, hwAccel: hwAccel),
+      ),
     );
     _subs.add(_ctrl.player.stream.playing.listen((p) {
       if (!mounted) return;
@@ -230,14 +237,13 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     } else if (widget.startFromBeginning) {
       _seeked = true;
     }
-    // Directo entrelazado + aceleración por hardware: `auto-copy` devuelve los
-    // fotogramas a CPU para que `bwdif` desentrelace SIN renunciar a la GPU
-    // (se fija ANTES de abrir para no reinicializar el decodificador). En VOD
-    // no se toca el hwdec (es progresivo y así se preserva el seek de reanudar);
-    // con aceleración apagada, hwdec ya es software y bwdif funciona igual.
-    if (_isLive && deinterlace && hwAccel) {
-      _ctrl.setHwdec('auto-copy');
-    }
+    // Mismo hwdec que el de la configuración del VideoController, fijado ANTES
+    // de abrir para que el decodificador ya arranque en modo copy (la escritura
+    // del VideoController puede llegar tras open y reinicializarlo un instante).
+    // Al ser el MISMO valor en ambos sitios, da igual cuál aterrice el último.
+    final hwdec =
+        initialHwdec(live: _isLive, deinterlace: deinterlace, hwAccel: hwAccel);
+    if (hwdec != null) _ctrl.setHwdec(hwdec);
     _ctrl.open(widget.item.streamUrl);
     // Config por tipo. bwdif requiere la libmpv completa (ver tool/patch_libmpv.sh).
     _ctrl.configure(

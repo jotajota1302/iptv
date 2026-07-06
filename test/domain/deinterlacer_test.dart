@@ -28,4 +28,25 @@ void main() {
       expect(d.label, isNotEmpty);
     }
   });
+
+  group('initialHwdec', () {
+    test('directo entrelazado con GPU: auto-copy para que el filtro CPU actúe',
+        () {
+      expect(initialHwdec(live: true, deinterlace: true, hwAccel: true),
+          'auto-copy');
+    });
+
+    test('sin desentrelazado o en VOD: null (deja el default del controlador)',
+        () {
+      expect(initialHwdec(live: true, deinterlace: false, hwAccel: true),
+          isNull);
+      expect(initialHwdec(live: false, deinterlace: false, hwAccel: true),
+          isNull);
+    });
+
+    test('sin aceleración por hardware: null (no fuerza nada)', () {
+      expect(initialHwdec(live: true, deinterlace: true, hwAccel: false),
+          isNull);
+    });
+  });
 }

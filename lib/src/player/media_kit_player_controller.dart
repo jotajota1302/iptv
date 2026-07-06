@@ -147,6 +147,10 @@ class MediaKitPlayerController implements PlayerController {
       'Códec de audio': await get('audio-codec-name'),
       'Bitrate de vídeo': mbps(await get('video-bitrate')),
       'Decodificación': await get('hwdec-current'),
+      // Para verificar el desentrelazado: debe verse bwdif/estdif en directo y
+      // la decodificación en modo *copy* (d3d11va-copy); con d3d11va directo
+      // el filtro no actúa.
+      'Filtro de vídeo': await get('vf'),
     };
   }
 

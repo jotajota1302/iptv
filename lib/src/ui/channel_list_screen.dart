@@ -88,10 +88,19 @@ class _ChannelListScreenState extends ConsumerState<ChannelListScreen> {
     if (_previewCtrl != null) return;
     final ctrl = MediaKitPlayerController();
     _previewCtrl = ctrl;
+    final hwAccel = ref.read(hardwareAccelProvider);
+    // hwdec en la configuración (no con setProperty a posteriori): el
+    // VideoController fija su propio hwdec al crearse y pisaría el valor
+    // manual. Ver [initialHwdec].
     _previewVideo = VideoController(
       ctrl.player,
       configuration: VideoControllerConfiguration(
-          enableHardwareAcceleration: ref.read(hardwareAccelProvider)),
+        enableHardwareAcceleration: hwAccel,
+        hwdec: initialHwdec(
+            live: true,
+            deinterlace: ref.read(deinterlaceProvider),
+            hwAccel: hwAccel),
+      ),
     );
   }
 
